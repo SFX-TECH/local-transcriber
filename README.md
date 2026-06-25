@@ -7,7 +7,7 @@
 ![Privacy](https://img.shields.io/badge/privacy-100%25%20local-2ea44f)
 ![License](https://img.shields.io/badge/license-proprietary-8a8a8a)
 
-**Source is private by design** — public showcase only.
+**Source is private by design**: public showcase only.
 
 <!-- drop a screenshot of the live-transcript UI here: assets/hero.png -->
 
@@ -18,7 +18,7 @@ Cloud transcription tools cap file size, hide good models behind a paywall, and 
 
 ## What it does
 - **Drag and drop** a video or audio file of **any length** (a 30-minute talk is fine).
-- Runs **OpenAI Whisper locally** (via `faster-whisper`) on your GPU — a 30-minute file finishes in ~1-3 minutes — and falls back to CPU automatically if needed.
+- Runs **OpenAI Whisper locally** (via `faster-whisper`) on your GPU, a 30-minute file finishes in ~1-3 minutes, and falls back to CPU automatically if needed.
 - Export as **plain text (.txt), subtitles (.srt), or web captions (.vtt)**.
 - Source files are **deleted after each job**. Nothing ever leaves your computer.
 
