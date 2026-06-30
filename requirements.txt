@@ -19,9 +19,8 @@ huggingface_hub==1.19.0
 requests==2.34.2
 
 # --- GPU (CUDA) runtime libraries ---
-# Needed for the RTX 5070 / CUDA path on Windows. They are plain pip wheels and
-# are harmless if no GPU is present (the app self-tests CUDA and falls back to
-# CPU). The CPU-only Docker image uses requirements-cpu.txt instead and skips
-# these to stay small.
+# Needed for the NVIDIA CUDA path. They are plain pip wheels and are harmless if
+# no GPU is present (the app self-tests CUDA and falls back to CPU). The CPU-only
+# Docker image uses requirements-cpu.txt instead and skips these to stay small.
 nvidia-cublas-cu12==12.9.2.10
 nvidia-cudnn-cu12==9.23.1.3

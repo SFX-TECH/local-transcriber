@@ -29,6 +29,10 @@ desktop.ini
 # Logs
 *.log
 
-# Browser-automation artifacts (verification screenshots, traces)
+# Local agent/editor tooling configs (Cline / Roo modes)
+.clinerules-*
+
+# Browser-automation artifacts (verification screenshots, traces).
+# Only root-level pngs are ignored; committed UI assets live under assets/.
 .playwright-mcp/
-*.png
+/*.png

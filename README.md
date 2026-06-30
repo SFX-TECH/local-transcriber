@@ -5,9 +5,9 @@ Transcribe your own video/audio files **on this machine** with OpenAI's Whisper
 replace tools that choke on large files or hide behind a paywall.
 
 - Drag-and-drop a video or audio file of **any length** (a 30-minute talk is fine).
-- Runs on your **RTX 5070 GPU** when it can (a 30-min file finishes in ~1-3 min);
-  if the GPU ever can't be used, it automatically falls back to the CPU (your
-  i9-14900KF is still fast).
+- Uses your **GPU** when one is available (a 30-min file can finish in a couple of
+  minutes on a recent NVIDIA card); if no usable GPU is found it automatically
+  falls back to the **CPU**.
 - Live transcript streams in as it runs, with a progress bar and time estimate.
 - A badge up top tells you whether it is running on **GPU** or **CPU**.
 - Output as plain text (`.txt`), subtitles (`.srt`), or web captions (`.vtt`),
@@ -30,12 +30,12 @@ Large v3 ~3 GB) and is cached for next time.
 | Tiny / Base | fastest | rough | quick drafts |
 | **Small** | fast | good | sensible default |
 | Medium | slower | better | |
-| **Large v3** | slowest | best | great on your GPU; best for important transcripts |
+| **Large v3** | slowest | best | best on a GPU; use for important transcripts |
 
 ## First-time setup
 
 Run **`setup.bat`** once. It needs Python 3.11 (from python.org) and `ffmpeg` on
-PATH (already installed on this machine). It creates `.venv` and installs the
+your PATH (or point `FFMPEG_PATH` at it). It creates `.venv` and installs the
 pinned dependencies from `requirements.txt` (a ~1.5 GB download the first time).
 
 ## If it ever breaks
@@ -53,7 +53,7 @@ A CPU container is provided so the app runs anywhere with Docker, no Python
 setup needed. See **`TESTING.md`** and the comments in `Dockerfile` /
 `docker-compose.yml`. Models are kept in a persistent cache volume, so they are
 not re-downloaded on every run, and transcripts land in your local `output\`
-folder. An optional `Dockerfile.gpu` builds a CUDA image for the RTX 5070 (needs
+folder. An optional `Dockerfile.gpu` builds a CUDA image for NVIDIA GPUs (needs
 the NVIDIA Container Toolkit and `--gpus all`).
 
 ```

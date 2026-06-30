@@ -9,7 +9,6 @@ to the CPU instead of crashing. Models are cached after first load.
 
 from __future__ import annotations
 
-import glob
 import os
 import shutil
 import subprocess
@@ -21,24 +20,28 @@ from typing import Iterator, Optional
 import numpy as np
 from faster_whisper import WhisperModel
 
-# --- ffmpeg / ffprobe discovery (Gyan WinGet build, then PATH) ----------------
-_GYAN = glob.glob(
-    r"C:\Users\jesse\AppData\Local\Microsoft\WinGet\Packages"
-    r"\Gyan.FFmpeg_Microsoft.Winget.Source_*\ffmpeg-*-full_build\bin"
-)
-
-
+# --- ffmpeg / ffprobe discovery ----------------------------------------------
+# Resolution order for each tool, so the app stays portable with no
+# machine-specific paths baked in:
+#   1. An explicit override env var (FFMPEG_PATH / FFPROBE_PATH), pointing at
+#      either the executable itself or a directory that contains it.
+#   2. The system PATH (shutil.which).
 def _tool(name: str) -> str:
-    for d in _GYAN:
-        p = os.path.join(d, f"{name}.exe")
-        if os.path.exists(p):
-            return p
+    override = os.environ.get(f"{name.upper()}_PATH", "").strip()
+    if override:
+        if os.path.isdir(override):
+            found = shutil.which(name, path=override)
+        else:
+            found = override if os.path.isfile(override) else shutil.which(override)
+        if found:
+            return found
     found = shutil.which(name)
     if found:
         return found
     raise RuntimeError(
-        f"{name} not found. Install ffmpeg or put it on PATH "
-        f"(https://www.gyan.dev/ffmpeg/builds/)."
+        f"{name} not found. Install ffmpeg and make sure it is on your PATH, or "
+        f"set the {name.upper()}_PATH environment variable to its location "
+        f"(https://ffmpeg.org/download.html)."
     )
 
 
