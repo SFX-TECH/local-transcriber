@@ -9,6 +9,7 @@ to the CPU instead of crashing. Models are cached after first load.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -238,3 +239,39 @@ def to_vtt(segments: list[dict]) -> str:
         lines.append(s["text"].strip())
         lines.append("")
     return "\n".join(lines)
+
+
+def _mmss(seconds: float) -> str:
+    seconds = max(0, int(float(seconds)))
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
+def to_md(segments: list[dict], title: str = "Transcript",
+          with_timestamps: bool = True) -> str:
+    """Markdown transcript: a title heading then one paragraph per segment."""
+    lines = [f"# {title}", ""]
+    for s in segments:
+        text = s["text"].strip()
+        if with_timestamps:
+            lines.append(f"**[{_mmss(s['start'])}]** {text}")
+        else:
+            lines.append(text)
+        lines.append("")
+    return "\n".join(lines).strip() + "\n"
+
+
+def to_json(segments: list[dict], duration: float = 0.0,
+            title: str = "Transcript") -> str:
+    """Structured JSON with per-segment timestamps, easy to post-process."""
+    payload = {
+        "title": title,
+        "duration": round(float(duration or 0.0), 2),
+        "segment_count": len(segments),
+        "segments": [
+            {"start": round(float(s["start"]), 3),
+             "end": round(float(s["end"]), 3),
+             "text": s["text"].strip()}
+            for s in segments
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"

@@ -80,6 +80,37 @@ def test_format_functions() -> None:
     print("[ok] format functions: txt/srt/vtt well-formed and non-empty")
 
 
+def test_export_formats() -> None:
+    """Markdown, JSON, and DOCX exports are well-formed and non-empty."""
+    segs = [
+        {"start": 0.0, "end": 1.5, "text": "Hello world."},
+        {"start": 65.0, "end": 67.0, "text": "Past a minute."},
+    ]
+    md = core.to_md(segs, title="Demo")
+    assert md.startswith("# Demo"), "md should start with the title heading"
+    assert "**[0:00]** Hello world." in md
+    assert "**[1:05]** Past a minute." in md, "md mm:ss past a minute wrong"
+
+    import json as _json
+    data = _json.loads(core.to_json(segs, duration=67.0, title="Demo"))
+    assert data["segment_count"] == 2 and data["title"] == "Demo"
+    assert data["segments"][1]["text"] == "Past a minute."
+
+    from io import BytesIO
+    from docx import Document
+    doc = Document()
+    doc.add_heading("Demo", level=1)
+    for s in segs:
+        p = doc.add_paragraph()
+        p.add_run(f"[{core._mmss(s['start'])}] ").bold = True
+        p.add_run(s["text"])
+    buf = BytesIO()
+    doc.save(buf)
+    blob = buf.getvalue()
+    assert len(blob) > 0 and blob[:2] == b"PK", "docx should be a non-empty zip"
+    print("[ok] export formats: md/json/docx well-formed and non-empty")
+
+
 def test_end_to_end_pipeline() -> None:
     """Synthesize audio, run the real pipeline, write the 3 files, assert non-empty."""
     workdir = tempfile.mkdtemp(prefix="smoke_")
@@ -134,7 +165,7 @@ def test_end_to_end_pipeline() -> None:
 
 # --- standalone runner -------------------------------------------------------
 def _main() -> int:
-    tests = [test_format_functions, test_end_to_end_pipeline]
+    tests = [test_format_functions, test_export_formats, test_end_to_end_pipeline]
     failures = 0
     for t in tests:
         try:

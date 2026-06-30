@@ -4,69 +4,94 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Local Transcriber</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%236ea8fe'/><text x='16' y='23' font-size='15' font-family='sans-serif' font-weight='700' fill='%230c0f14' text-anchor='middle'>LT</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%234f46e5'/><text x='16' y='23' font-size='15' font-family='sans-serif' font-weight='700' fill='%23ffffff' text-anchor='middle'>LT</text></svg>" />
   <link rel="stylesheet" href="/static/style.css" />
+  <script>
+    // Apply saved theme before first paint (light is the default).
+    (function () {
+      try {
+        var t = localStorage.getItem("lt-theme");
+        if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
-  <main class="wrap">
-    <header class="head">
+  <header class="topbar">
+    <div class="brand">
       <div class="logo">LT</div>
-      <div class="head-text">
-        <h1>Local Transcriber</h1>
-        <p class="sub">Whisper, running on your machine. No size limits, no upload to the cloud, no paywall.</p>
+      <div class="brand-text">
+        <span class="brand-name">Local Transcriber</span>
+        <span class="brand-tag">Private, on-device transcription</span>
       </div>
+    </div>
+    <div class="topbar-right">
+      <button id="newFile" class="icon-btn" title="Start a new transcription" hidden>New file</button>
       <span id="devbadge" class="badge idle" title="Where transcription runs">checking hardware...</span>
-    </header>
+      <button id="themeToggle" class="icon-btn" title="Switch theme" aria-label="Switch theme">Dark</button>
+    </div>
+  </header>
 
-    <section id="dropzone" class="dropzone" tabindex="0" role="button"
-             aria-label="Choose or drop a video or audio file">
-      <input id="file" type="file"
-             accept="video/*,audio/*,.mp4,.mov,.mkv,.webm,.avi,.m4a,.mp3,.wav,.aac,.flac,.ogg" hidden />
-      <div class="dz-inner">
-        <div class="dz-icon">+</div>
-        <p class="dz-title">Drop a video or audio file here</p>
-        <p class="dz-hint">or click to browse &middot; mp4, mov, mkv, mp3, wav, m4a, and more &middot; any length</p>
+  <main class="wrap">
+    <!-- Upload -->
+    <section id="uploadCard" class="card upload">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button"
+           aria-label="Choose or drop a video or audio file">
+        <input id="file" type="file"
+               accept="video/*,audio/*,.mp4,.mov,.mkv,.webm,.avi,.m4a,.mp3,.wav,.aac,.flac,.ogg" hidden />
+        <div class="dz-inner">
+          <div class="dz-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 16V4M7 9l5-5 5 5" />
+              <path d="M5 20h14" />
+            </svg>
+          </div>
+          <p class="dz-title">Drop a video or audio file</p>
+          <p class="dz-hint">or click to browse &middot; mp4, mov, mkv, mp3, wav, m4a, and more &middot; any length</p>
+        </div>
+        <div id="filechip" class="filechip" hidden>
+          <span id="filename" class="fc-name"></span>
+          <span id="filesize" class="fc-size"></span>
+          <button id="clearfile" class="fc-x" title="Remove" aria-label="Remove file">&times;</button>
+        </div>
       </div>
-      <div id="filechip" class="filechip" hidden>
-        <span id="filename" class="fc-name"></span>
-        <span id="filesize" class="fc-size"></span>
-        <button id="clearfile" class="fc-x" title="Remove" aria-label="Remove file">&times;</button>
+
+      <div class="controls">
+        <label class="ctl">
+          <span>Model</span>
+          <select id="model">
+            <option value="tiny">Tiny &middot; fastest, roughest</option>
+            <option value="base">Base</option>
+            <option value="small" selected>Small &middot; good balance</option>
+            <option value="medium">Medium &middot; more accurate</option>
+            <option value="large-v3">Large v3 &middot; best quality</option>
+          </select>
+        </label>
+        <label class="ctl">
+          <span>Language</span>
+          <select id="language">
+            <option value="auto" selected>Auto-detect</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="it">Italian</option>
+            <option value="pt">Portuguese</option>
+            <option value="nl">Dutch</option>
+            <option value="hi">Hindi</option>
+            <option value="zh">Chinese</option>
+            <option value="ja">Japanese</option>
+            <option value="ar">Arabic</option>
+            <option value="ru">Russian</option>
+          </select>
+        </label>
+        <button id="go" class="btn primary" disabled>Transcribe</button>
       </div>
     </section>
 
-    <section class="controls">
-      <label class="ctl">
-        <span>Model</span>
-        <select id="model">
-          <option value="tiny">Tiny &middot; fastest, roughest</option>
-          <option value="base">Base</option>
-          <option value="small" selected>Small &middot; good balance</option>
-          <option value="medium">Medium &middot; more accurate</option>
-          <option value="large-v3">Large v3 &middot; best (great on your GPU)</option>
-        </select>
-      </label>
-      <label class="ctl">
-        <span>Language</span>
-        <select id="language">
-          <option value="auto" selected>Auto-detect</option>
-          <option value="en">English</option>
-          <option value="es">Spanish</option>
-          <option value="fr">French</option>
-          <option value="de">German</option>
-          <option value="it">Italian</option>
-          <option value="pt">Portuguese</option>
-          <option value="nl">Dutch</option>
-          <option value="hi">Hindi</option>
-          <option value="zh">Chinese</option>
-          <option value="ja">Japanese</option>
-          <option value="ar">Arabic</option>
-          <option value="ru">Russian</option>
-        </select>
-      </label>
-      <button id="go" class="go" disabled>Transcribe</button>
-    </section>
-
-    <section id="progress" class="panel" hidden>
+    <!-- Progress -->
+    <section id="progress" class="card progress" hidden>
       <div class="prow">
         <span id="device" class="badge">checking device...</span>
         <span id="status" class="status">Starting...</span>
@@ -76,20 +101,53 @@
       <div class="bar"><div id="fill" class="fill"></div></div>
     </section>
 
-    <section id="result" class="panel result" hidden>
-      <div class="rhead">
-        <h2 id="rtitle">Transcript</h2>
-        <div class="downloads">
-          <a id="dl-txt" class="dl" download>.txt</a>
-          <a id="dl-srt" class="dl" download>.srt</a>
-          <a id="dl-vtt" class="dl" download>.vtt</a>
-          <button id="copy" class="dl">Copy</button>
+    <!-- Result -->
+    <section id="result" class="result" hidden>
+      <!-- synced media player -->
+      <div id="playerWrap" class="card player" hidden></div>
+
+      <!-- toolbar: search, edit, export, copy -->
+      <div id="toolbar" class="card toolbar" hidden>
+        <div class="search">
+          <svg class="search-ico" viewBox="0 0 24 24" width="16" height="16" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+          </svg>
+          <input id="search" type="search" placeholder="Search transcript" autocomplete="off" />
+          <span id="searchCount" class="search-count"></span>
+          <button id="searchPrev" class="mini" title="Previous match" hidden>&uarr;</button>
+          <button id="searchNext" class="mini" title="Next match" hidden>&darr;</button>
+        </div>
+        <div class="tb-actions">
+          <button id="editToggle" class="btn ghost" aria-pressed="false" title="Edit the transcript inline">Edit</button>
+          <span class="tb-group" role="group" aria-label="Export">
+            <span class="tb-label">Export</span>
+            <button id="dl-txt"  class="chip" data-fmt="txt"  title="Plain text">txt</button>
+            <button id="dl-srt"  class="chip" data-fmt="srt"  title="SubRip subtitles">srt</button>
+            <button id="dl-vtt"  class="chip" data-fmt="vtt"  title="WebVTT captions">vtt</button>
+            <button id="dl-md"   class="chip" data-fmt="md"   title="Markdown">md</button>
+            <button id="dl-json" class="chip" data-fmt="json" title="JSON with timestamps">json</button>
+            <button id="dl-docx" class="chip" data-fmt="docx" title="Word document">docx</button>
+          </span>
+          <span class="tb-group" role="group" aria-label="Copy">
+            <button id="copy" class="btn ghost" title="Copy plain text">Copy</button>
+            <button id="copyTimes" class="btn ghost" title="Copy with timestamps">Copy + times</button>
+          </span>
         </div>
       </div>
-      <p id="folder" class="folder"></p>
-      <div id="transcript" class="transcript" aria-live="polite"></div>
+
+      <!-- transcript -->
+      <div class="card result-body">
+        <div class="rhead">
+          <h2 id="rtitle">Transcript</h2>
+          <span id="rmeta" class="rmeta"></span>
+        </div>
+        <p id="folder" class="folder"></p>
+        <div id="transcript" class="transcript" aria-live="polite"></div>
+      </div>
     </section>
   </main>
+
   <script src="/static/app.js"></script>
 </body>
 </html>

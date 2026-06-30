@@ -21,10 +21,12 @@ from fastapi import FastAPI, UploadFile, Form, HTTPException
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
+    Response,
     StreamingResponse,
     JSONResponse,
 )
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 import transcribe_core as core
 
@@ -191,6 +193,55 @@ async def download(job_id: str, fmt: str) -> FileResponse:
     if not path.exists():
         raise HTTPException(404, "File missing.")
     return FileResponse(str(path), filename=path.name, media_type="text/plain")
+
+
+# --- DOCX export -------------------------------------------------------------
+# Text formats (txt/srt/vtt/md/json) are generated in the browser so they honor
+# inline transcript edits. DOCX needs python-docx, so it is built here from the
+# (possibly edited) segments the page posts back. Still fully local.
+class _ExportSegment(BaseModel):
+    start: float = 0.0
+    end: float = 0.0
+    text: str = ""
+
+
+class _DocxRequest(BaseModel):
+    segments: list[_ExportSegment]
+    title: str = "Transcript"
+    with_timestamps: bool = True
+
+
+@app.post("/api/export/docx")
+async def export_docx(req: _DocxRequest) -> Response:
+    try:
+        from docx import Document  # lazy: app still runs if docx is absent
+    except ImportError:
+        raise HTTPException(500, "python-docx is not installed on the server.")
+
+    doc = Document()
+    doc.add_heading(req.title or "Transcript", level=1)
+    for seg in req.segments:
+        text = (seg.text or "").strip()
+        if not text:
+            continue
+        para = doc.add_paragraph()
+        if req.with_timestamps:
+            stamp = para.add_run(f"[{core._mmss(seg.start)}] ")
+            stamp.bold = True
+        para.add_run(text)
+
+    from io import BytesIO
+    buf = BytesIO()
+    doc.save(buf)
+    filename = f"{_safe_stem(req.title or 'transcript')}.docx"
+    return Response(
+        content=buf.getvalue(),
+        media_type=(
+            "application/vnd.openxmlformats-officedocument"
+            ".wordprocessingml.document"
+        ),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/jobs/{job_id}/folder")

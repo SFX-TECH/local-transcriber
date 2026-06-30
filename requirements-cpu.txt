@@ -12,3 +12,5 @@ onnxruntime==1.26.0
 tokenizers==0.23.1
 huggingface_hub==1.19.0
 requests==2.34.2
+python-docx==1.2.0
+lxml==6.1.1
