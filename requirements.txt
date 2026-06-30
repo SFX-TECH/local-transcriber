@@ -1,0 +1,27 @@
+# Local Transcriber dependencies, pinned to the versions known to work.
+# These are the EXACT versions in the working .venv, so re-running setup.bat
+# will not change a thing. Everything installs from PyPI; nothing phones home
+# at runtime.
+
+# --- core app ---
+faster-whisper==1.1.1
+ctranslate2==4.8.0
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- pinned transitive deps that have broken builds before if left floating ---
+numpy==2.4.6
+av==17.1.0
+onnxruntime==1.26.0
+tokenizers==0.23.1
+huggingface_hub==1.19.0
+requests==2.34.2
+
+# --- GPU (CUDA) runtime libraries ---
+# Needed for the RTX 5070 / CUDA path on Windows. They are plain pip wheels and
+# are harmless if no GPU is present (the app self-tests CUDA and falls back to
+# CPU). The CPU-only Docker image uses requirements-cpu.txt instead and skips
+# these to stay small.
+nvidia-cublas-cu12==12.9.2.10
+nvidia-cudnn-cu12==9.23.1.3

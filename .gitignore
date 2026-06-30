@@ -1,0 +1,34 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# App runtime data (all local, never committed)
+output/
+uploads/
+
+# Model caches (Whisper / HuggingFace / CTranslate2)
+models/
+model-cache/
+.cache/
+*.bin
+
+# OS / editor noise
+Thumbs.db
+.DS_Store
+desktop.ini
+*.swp
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Browser-automation artifacts (verification screenshots, traces)
+.playwright-mcp/
+*.png
