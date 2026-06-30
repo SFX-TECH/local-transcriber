@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    name: smoke test (CPU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies (CPU only)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-cpu.txt
+
+      # Runs the real pipeline on a 4s synthesized clip with the tiny model.
+      # The tiny model is fetched once from Hugging Face on the runner; no
+      # secrets and no user data are involved. If ffmpeg lacks the flite voice,
+      # the test falls back to a tone clip and still verifies the pipeline.
+      - name: Run smoke test
+        env:
+          SMOKE_MODEL: tiny
+          HF_HUB_DISABLE_TELEMETRY: "1"
+        run: python test_smoke.py
