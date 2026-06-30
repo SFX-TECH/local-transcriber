@@ -1,73 +1,130 @@
 # Local Transcriber
 
-Transcribe your own video/audio files **on this machine** with OpenAI's Whisper
-(via `faster-whisper`). No cloud upload, no file-size cap, no paywall. Built to
-replace tools that choke on large files or hide behind a paywall.
+> Turn any video or audio into text on your own machine with OpenAI's Whisper. No cloud, no file-size cap, no paywall, nothing ever uploaded.
 
-- Drag-and-drop a video or audio file of **any length** (a 30-minute talk is fine).
-- Uses your **GPU** when one is available (a 30-min file can finish in a couple of
-  minutes on a recent NVIDIA card); if no usable GPU is found it automatically
-  falls back to the **CPU**.
-- Live transcript streams in as it runs, with a progress bar and time estimate.
-- A badge up top tells you whether it is running on **GPU** or **CPU**.
-- Output as plain text (`.txt`), subtitles (`.srt`), or web captions (`.vtt`),
-  saved to the `output\` folder and downloadable or copyable from the page.
+![License](https://img.shields.io/badge/license-MIT-2ea44f)
+![Privacy](https://img.shields.io/badge/privacy-100%25%20local-2ea44f)
+![AI](https://img.shields.io/badge/AI-Whisper%20offline-7a5cff)
+![Stack](https://img.shields.io/badge/FastAPI-Python%203.11-3b5bdb)
+![Docker](https://img.shields.io/badge/Docker-ready-000000)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Jesse%20Jolly-0a66c2)](https://linkedin.com/in/jessegjolly)
 
-## Use it
+![Local Transcriber](assets/screenshot.png)
 
-1. Double-click **`run.bat`**. A browser tab opens at <http://localhost:8765>.
-   (Keep the little black window open while you work; close it to stop the app.)
-2. Drop your file, pick a **Model** and **Language**, click **Transcribe**.
-3. Watch the live transcript, then download `.txt` / `.srt` / `.vtt` or copy it.
+A premium, private alternative to tools like Otter.ai: a clean local web app that
+transcribes your files with Whisper, plays them back in sync with the transcript,
+and exports to six formats. Everything runs on your machine.
 
-The first time you use a given model it downloads once (Small ~0.5 GB,
-Large v3 ~3 GB) and is cached for next time.
+![Demo](assets/demo.gif)
+
+---
+
+## The problem
+
+Cloud transcription tools cap file size, hide the good models behind a paywall, and
+make you upload private recordings to someone else's server. For long talks, client
+calls, or anything sensitive, that is the wrong trade.
+
+## What it does
+
+- **Drag and drop** a video or audio file of **any length** (a 30-minute talk is fine).
+- Runs **OpenAI Whisper locally** (via `faster-whisper`) on your GPU when one is
+  available (a 30-minute file can finish in a couple of minutes), and falls back to
+  CPU automatically.
+- **Live transcript** streams in as it runs, with a progress bar, time estimate, and
+  a GPU/CPU badge.
+- **Synced media player**: the file plays back in the browser and the current line
+  highlights as it goes. Click any line to jump there.
+- **Edit** the transcript inline, **search** it with highlighting, and **copy** it
+  with or without timestamps.
+- **Export** to plain text (`.txt`), subtitles (`.srt`), web captions (`.vtt`),
+  Markdown (`.md`), JSON with timestamps (`.json`), and Word (`.docx`).
+- Source files are **deleted after each job**. Nothing ever leaves your computer.
+- Ships with a **CPU Docker image** so it runs anywhere, plus an optional GPU image.
+
+## How it works
+
+```mermaid
+flowchart LR
+    UP["Drop video / audio<br/>(any length)"] --> FF["ffmpeg<br/>extract audio"]
+    FF --> W["faster-whisper (Whisper)<br/>GPU, auto CPU fallback"]
+    W -->|"stream segments (SSE)"| UI["Browser UI<br/>live transcript + synced player"]
+    UI --> EDIT["edit, search, click to seek"]
+    EDIT --> EX["Export<br/>txt, srt, vtt, md, json, docx"]
+    UP -. deleted after job .-> X["(source removed)"]
+```
+
+The browser embeds your file with a local object URL, so playback and sync happen
+entirely on your machine. Text exports are built in the browser (so they honor your
+edits); the Word export is built locally by the server with `python-docx`.
+
+## Quickstart
+
+### Windows (no Docker)
+
+1. Install [Python 3.11](https://www.python.org/downloads/) and
+   [ffmpeg](https://ffmpeg.org/download.html) (on your PATH, or set `FFMPEG_PATH`).
+2. Double-click **`setup.bat`** once. It builds a virtual environment and installs
+   the pinned dependencies.
+3. Double-click **`run.bat`**. A browser opens at <http://localhost:8765>.
+4. Drop a file, pick a model and language, click **Transcribe**.
+
+### Docker (any platform)
+
+```bash
+docker compose up --build      # CPU image, then open http://localhost:8765
+```
+
+Transcripts are written to your local `output/` folder, and Whisper models download
+once into a persistent cache volume (never re-downloaded). For NVIDIA GPUs, an
+optional image is provided (needs the NVIDIA Container Toolkit):
+
+```bash
+docker compose --profile gpu up --build gpu
+```
 
 ### Which model?
 
-| Model | Speed | Accuracy | Notes |
-|-------|-------|----------|-------|
+| Model | Speed | Accuracy | Use it for |
+|-------|-------|----------|------------|
 | Tiny / Base | fastest | rough | quick drafts |
-| **Small** | fast | good | sensible default |
-| Medium | slower | better | |
-| **Large v3** | slowest | best | best on a GPU; use for important transcripts |
+| **Small** | fast | good | the sensible default |
+| Medium | slower | better | cleaner results |
+| **Large v3** | slowest | best | important transcripts (great on a GPU) |
 
-## First-time setup
+Models download once (Small ~0.5 GB, Large v3 ~3 GB) and are cached after that.
 
-Run **`setup.bat`** once. It needs Python 3.11 (from python.org) and `ffmpeg` on
-your PATH (or point `FFMPEG_PATH` at it). It creates `.venv` and installs the
-pinned dependencies from `requirements.txt` (a ~1.5 GB download the first time).
+## Tech
 
-## If it ever breaks
+| Layer | Stack |
+|---|---|
+| Server | Python 3.11 + FastAPI, server-sent events for live streaming |
+| Transcription | faster-whisper (Whisper) + ffmpeg, GPU/CPU auto-select with a real CUDA self-test |
+| UI | Local web page (HTML/CSS/JS), light theme with a dark toggle, synced player |
+| Exports | txt / srt / vtt / md / json in the browser, docx via python-docx |
+| Packaging | Docker (CPU and optional GPU), persistent model-cache volume |
 
-Delete the `.venv` folder and run **`setup.bat`** again to rebuild the
-environment from the exact pinned versions in `requirements.txt`.
+## Testing
 
-If a file is rejected or fails: non-media files (documents, images, archives)
-are turned away with a message, and a corrupt file or one with no audio track
-reports a clean error instead of crashing.
+A fast, offline smoke test verifies the formatters and the real ffmpeg to
+faster-whisper pipeline:
 
-## Run it in Docker (optional)
-
-A CPU container is provided so the app runs anywhere with Docker, no Python
-setup needed. See **`TESTING.md`** and the comments in `Dockerfile` /
-`docker-compose.yml`. Models are kept in a persistent cache volume, so they are
-not re-downloaded on every run, and transcripts land in your local `output\`
-folder. An optional `Dockerfile.gpu` builds a CUDA image for NVIDIA GPUs (needs
-the NVIDIA Container Toolkit and `--gpus all`).
-
-```
-docker compose up --build      # build and start the CPU app on http://localhost:8765
+```bash
+python test_smoke.py        # prints SMOKE TEST PASSED, exits 0 on success
 ```
 
-## What's where
+See [`TESTING.md`](TESTING.md) for the full manual checklist.
 
-- `app.py` -- the local web server (FastAPI): upload, job queue, streaming, downloads.
-- `transcribe_core.py` -- ffmpeg audio extraction + faster-whisper, GPU/CPU auto.
-- `static\` -- the web page (HTML/CSS/JS).
-- `requirements.txt` -- pinned Python dependencies.
-- `output\` -- your saved transcripts, one folder per job.
-- `uploads\` -- temporary; source files are deleted after each job.
-- `Dockerfile`, `Dockerfile.gpu`, `docker-compose.yml` -- optional containers.
+## Status
 
-Everything runs locally. Nothing leaves your computer.
+Working, tested, and containerized. Runs fully offline once a model is cached.
+Light theme by default with an optional dark mode, synced playback, inline editing,
+search, and six export formats. CPU image verified; optional GPU image provided.
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).
+
+---
+
+Built by **Jesse Jolly** &middot; [SFX Tech Innovation](https://sfxtechinnovation.com) &middot; [LinkedIn](https://linkedin.com/in/jessegjolly)
