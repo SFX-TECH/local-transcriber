@@ -1,0 +1,14 @@
+# CPU-only dependency set for the Docker image. Same pinned versions as
+# requirements.txt but WITHOUT the NVIDIA CUDA wheels, so the container image
+# stays small. faster-whisper runs on CPU (int8) with just these.
+faster-whisper==1.1.1
+ctranslate2==4.8.0
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+numpy==2.4.6
+av==17.1.0
+onnxruntime==1.26.0
+tokenizers==0.23.1
+huggingface_hub==1.19.0
+requests==2.34.2

@@ -1,0 +1,41 @@
+# Local Transcriber -- OPTIONAL GPU image (NVIDIA CUDA 12 / cuDNN 9).
+#
+# This mirrors the working Windows setup: plain Python plus the NVIDIA cuBLAS
+# and cuDNN pip wheels (in requirements.txt). The CUDA driver itself is provided
+# at run time by the NVIDIA Container Toolkit, so this image stays far smaller
+# than a full nvidia/cuda base image.
+#
+# Requirements to actually use the GPU:
+#   1. NVIDIA driver on the host.
+#   2. NVIDIA Container Toolkit installed and wired into Docker.
+#   3. Run with GPU access, e.g.:  docker run --gpus all ...
+#      or `docker compose --profile gpu up` with the gpu service.
+#
+# If the GPU is not available at run time, the app self-tests CUDA and falls
+# back to CPU automatically, so this image still works without --gpus (just
+# slower). The CPU image (Dockerfile) remains the no-GPU default.
+
+FROM python:3.11-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# requirements.txt includes nvidia-cublas-cu12 and nvidia-cudnn-cu12 (cuDNN 9).
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# faster-whisper / ctranslate2 load cuBLAS and cuDNN from the pip wheel lib dirs;
+# they must be on the dynamic linker path.
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib
+
+COPY app.py transcribe_core.py test_smoke.py ./
+COPY static ./static
+
+ENV HF_HOME=/models
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8765
+CMD ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8765"]

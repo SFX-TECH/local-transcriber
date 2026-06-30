@@ -1,0 +1,35 @@
+# Keep the build context tiny and never ship local data into the image.
+.git/
+.gitignore
+.gitattributes
+
+# Python environment and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# App runtime data (mounted at run time, not baked in)
+output/
+uploads/
+
+# Model caches (mounted as a volume, never baked in)
+models/
+model-cache/
+.cache/
+*.bin
+
+# Dev / editor / tooling cruft
+.clinerules-*
+.playwright-mcp/
+*.png
+*.log
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Docs not needed inside the image
+README.md
+TESTING.md

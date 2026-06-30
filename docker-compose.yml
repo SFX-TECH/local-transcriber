@@ -1,0 +1,51 @@
+# Local Transcriber -- container orchestration.
+#
+#   docker compose up --build              # CPU image, default
+#   docker compose --profile gpu up --build gpu   # optional GPU image
+#
+# Both services share one model-cache volume, so a model downloaded by either is
+# reused by both and never re-downloaded. Transcripts are written to your local
+# ./output folder. Only one service should run at a time (they share port 8765).
+
+services:
+  # CPU service (default). Works anywhere Docker runs, no GPU needed.
+  transcriber:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local-transcriber:cpu
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./output:/app/output          # transcripts land in your local ./output
+      - model-cache:/models           # Whisper models persist here, downloaded once
+    environment:
+      - HF_HOME=/models
+    restart: unless-stopped
+
+  # OPTIONAL GPU service. Needs the NVIDIA Container Toolkit on the host.
+  # Start it explicitly:  docker compose --profile gpu up --build gpu
+  gpu:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    image: local-transcriber:gpu
+    ports:
+      - "8765:8765"
+    volumes:
+      - ./output:/app/output
+      - model-cache:/models
+    environment:
+      - HF_HOME=/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  model-cache:

@@ -15,7 +15,7 @@ body{
 }
 .wrap{max-width:860px;margin:0 auto;padding:40px 22px 80px}
 .head{display:flex;gap:16px;align-items:center;margin-bottom:26px}
-.head-text{min-width:0}
+.head-text{flex:1 1 auto;min-width:0}
 .logo{
   width:46px;height:46px;border-radius:12px;flex:0 0 auto;
   background:linear-gradient(135deg,var(--accent),var(--accent2));
@@ -24,7 +24,8 @@ body{
 h1{font-size:22px;margin:0;font-weight:700}
 .sub{margin:2px 0 0;color:var(--muted);font-size:13.5px}
 
-#devbadge{margin-left:auto;flex:0 0 auto;white-space:nowrap}
+#devbadge{margin-left:auto;flex:0 0 auto;white-space:nowrap;max-width:260px;
+  overflow:hidden;text-overflow:ellipsis}
 .badge.idle{
   background:#1c2230;color:var(--muted);border-color:var(--line);
   animation:pulse 1.4s ease-in-out infinite;

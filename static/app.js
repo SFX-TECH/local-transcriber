@@ -26,9 +26,15 @@ function mmss(s) {
   return m + ":" + String(ss).padStart(2, "0");
 }
 
+// The device note can be long on CPU ("CPU (int8) -- GPU unavailable: ...").
+// Show only the concise head ("CPU (int8)" / "GPU (CUDA, float16)") in the
+// badge and keep the full reason in the hover tooltip.
+function shortDevice(note) { return String(note).split(" -- ")[0].trim(); }
+
 // Resolve GPU vs CPU once on load and show a resting badge in the header.
 function applyDeviceBadge(el, note) {
-  el.textContent = note;
+  el.textContent = shortDevice(note);
+  el.title = note;
   el.classList.toggle("cpu", /cpu/i.test(note));
   el.classList.remove("idle");
 }
@@ -72,7 +78,8 @@ function startTimer() {
 function stopTimer() { clearInterval(timer); timer = null; }
 
 function setDevice(note) {
-  deviceEl.textContent = note;
+  deviceEl.textContent = shortDevice(note);
+  deviceEl.title = note;
   deviceEl.classList.toggle("cpu", /cpu/i.test(note));
 }
 
