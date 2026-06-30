@@ -1,0 +1,39 @@
+{{- if .Values.keda.enabled }}
+# KEDA ScaledObject: the headline autoscaling artifact.
+#
+# It watches the Redis work queue (a list) and scales the worker Deployment on
+# its length. minReplicaCount 0 means: when the queue is empty for cooldownPeriod
+# seconds, KEDA scales the workers all the way down to zero, so an idle service
+# costs nothing. When jobs arrive, KEDA scales back up to one worker per
+# `listLength` queued jobs, capped at maxReplicaCount.
+#
+# Requires KEDA installed in the cluster:
+#   helm repo add kedacore https://kedacore.github.io/charts
+#   helm install keda kedacore/keda --namespace keda --create-namespace
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "lt.worker.fullname" . }}
+  labels:
+    {{- include "lt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    name: {{ include "lt.worker.fullname" . }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}   # how often KEDA checks the queue (seconds)
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}      # idle seconds before scaling toward zero
+  minReplicaCount: {{ .Values.keda.minReplicas }}        # 0 = scale to zero when idle
+  maxReplicaCount: {{ .Values.keda.maxReplicas }}        # ceiling of concurrent workers
+  triggers:
+    - type: redis
+      metadata:
+        # In-cluster Redis, no auth. Use the fully-qualified, cross-namespace DNS
+        # name: the KEDA operator runs in its own namespace (keda), so a bare
+        # service name would not resolve from there. listName must match
+        # QUEUE_KEY in service/queue.py.
+        address: {{ printf "%s.%s.svc.cluster.local:%v" (include "lt.redis.fullname" .) .Release.Namespace .Values.redis.port | quote }}
+        listName: "transcribe:queue"
+        listLength: {{ .Values.keda.listLength | quote }}   # target queue length per replica
+        enableTLS: "false"
+        databaseIndex: "0"
+{{- end }}

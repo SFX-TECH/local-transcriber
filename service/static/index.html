@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local Transcriber (queue API)</title>
+  <style>
+    :root{--bg:#f4f6f9;--surface:#fff;--border:#e4e7ec;--text:#161a23;--muted:#667085;
+      --accent:#4f46e5;--accent2:#7c3aed;--good:#067647;--good-bg:#ecfdf3;--warn:#b54708}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);
+      font:15px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    .wrap{max-width:760px;margin:0 auto;padding:34px 20px 80px}
+    h1{font-size:20px;margin:0 0 2px}
+    .sub{color:var(--muted);font-size:13px;margin:0 0 22px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+      padding:18px;box-shadow:0 1px 3px rgba(16,24,40,.06);margin-bottom:16px}
+    label{display:block;font-size:12.5px;color:var(--muted);font-weight:600;margin:10px 0 5px}
+    input[type=file],select{width:100%;padding:9px 11px;border:1px solid var(--border);
+      border-radius:9px;font-size:14px;background:#fff;color:var(--text)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .row > div{flex:1;min-width:160px}
+    button{margin-top:14px;border:none;border-radius:10px;padding:11px 20px;font-size:14px;
+      font-weight:650;color:#fff;cursor:pointer;
+      background:linear-gradient(135deg,var(--accent),var(--accent2))}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .jobs{margin-top:4px}
+    .job{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border);
+      border-radius:10px;margin-bottom:8px;font-size:13.5px;background:#fff}
+    .pill{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+    .queued{background:#eef2ff;color:var(--accent)}
+    .running{background:#fff7ed;color:var(--warn)}
+    .done{background:var(--good-bg);color:var(--good)}
+    .error{background:#fef3f2;color:#b42318}
+    .job .id{font-variant-numeric:tabular-nums;color:var(--muted)}
+    .job .links a{color:var(--accent);text-decoration:none;margin-left:8px;font-weight:600}
+    .text{white-space:pre-wrap;background:#f8f9fb;border:1px solid var(--border);
+      border-radius:8px;padding:10px;margin-top:8px;font-size:13px;max-height:200px;overflow:auto}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Local Transcriber, queue API</h1>
+    <p class="sub">Submit a file, it lands on a Redis queue, a KEDA-scaled worker transcribes it, and the artifacts come back here. Fully self-hosted.</p>
+
+    <div class="card">
+      <label>Video or audio file</label>
+      <input id="file" type="file" accept="video/*,audio/*" />
+      <div class="row">
+        <div>
+          <label>Model</label>
+          <select id="model">
+            <option value="tiny">Tiny</option>
+            <option value="base">Base</option>
+            <option value="small" selected>Small</option>
+            <option value="medium">Medium</option>
+            <option value="large-v3">Large v3</option>
+          </select>
+        </div>
+        <div>
+          <label>Language</label>
+          <select id="language">
+            <option value="auto" selected>Auto-detect</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+          </select>
+        </div>
+      </div>
+      <button id="go">Submit job</button>
+    </div>
+
+    <div id="jobs" class="jobs"></div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const jobsEl = $("jobs");
+    const polling = {};
+
+    $("go").addEventListener("click", async () => {
+      const f = $("file").files[0];
+      if (!f) { alert("Pick a file first."); return; }
+      $("go").disabled = true;
+      const fd = new FormData();
+      fd.append("file", f);
+      fd.append("model", $("model").value);
+      fd.append("language", $("language").value);
+      try {
+        const res = await fetch("/jobs", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || res.status);
+        addJob(data.job_id, f.name);
+        poll(data.job_id);
+      } catch (e) {
+        alert("Submit failed: " + e.message);
+      } finally {
+        $("go").disabled = false;
+      }
+    });
+
+    function addJob(id, name) {
+      const div = document.createElement("div");
+      div.className = "job";
+      div.id = "job-" + id;
+      div.innerHTML = '<span class="pill queued">queued</span>' +
+        '<span class="name">' + escapeHtml(name) + '</span>' +
+        '<span class="id">' + id + '</span>' +
+        '<span class="links" style="margin-left:auto"></span>';
+      jobsEl.prepend(div);
+    }
+
+    function escapeHtml(t){return t.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+
+    async function poll(id) {
+      if (polling[id]) return;
+      polling[id] = setInterval(async () => {
+        const res = await fetch("/jobs/" + id);
+        if (!res.ok) return;
+        const job = await res.json();
+        const div = $("job-" + id);
+        if (!div) return;
+        const pill = div.querySelector(".pill");
+        pill.className = "pill " + job.status;
+        pill.textContent = job.status;
+        if (job.status === "done" || job.status === "error") {
+          clearInterval(polling[id]); delete polling[id];
+          if (job.status === "done") {
+            const links = div.querySelector(".links");
+            links.innerHTML = "";
+            for (const fmt of ["txt","srt","vtt","md","json"]) {
+              const a = document.createElement("a");
+              a.href = job.artifacts[fmt]; a.textContent = fmt; a.download = "";
+              links.appendChild(a);
+            }
+            const pre = document.createElement("div");
+            pre.className = "text";
+            pre.textContent = job.text || "(no speech detected)";
+            div.appendChild(pre);
+          } else {
+            const pre = document.createElement("div");
+            pre.className = "text"; pre.textContent = job.error || "error";
+            div.appendChild(pre);
+          }
+        }
+      }, 1500);
+    }
+  </script>
+</body>
+</html>

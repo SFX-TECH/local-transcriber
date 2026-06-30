@@ -121,6 +121,29 @@ Working, tested, and containerized. Runs fully offline once a model is cached.
 Light theme by default with an optional dark mode, synced playback, inline editing,
 search, and six export formats. CPU image verified; optional GPU image provided.
 
+## Scale it: Kubernetes + KEDA
+
+The single-process app above is one shape of this pipeline. For a backlog of long
+recordings, several people submitting at once, or a GPU you want to keep busy without
+paying for it while idle, there is a second shape: an async, queue-based service that
+autoscales Whisper workers **from zero** on queue depth and back to zero when quiet.
+
+```mermaid
+flowchart LR
+    C["Client"] --> API["transcriber-api<br/>(no inference)"]
+    API -->|"enqueue"| Q[("Redis queue")]
+    KEDA["KEDA"] -.->|"scale 0..N"| WK["worker pods<br/>faster-whisper"]
+    Q -->|"consume"| WK
+    WK -->|"artifacts"| ST[("Shared storage")]
+    API --> ST
+```
+
+Same `transcribe_core`, wrapped in a thin FastAPI, a Redis work queue, and a
+KEDA-scaled worker pool. Proven on Docker Desktop Kubernetes: zero to four workers
+and back to zero on queue depth, jobs transcribed and returned through the API. Try
+it with `make k8s-up && make demo`. Full writeup, chart, and the captured scaling
+proof are in [`deploy/README.md`](deploy/README.md).
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
