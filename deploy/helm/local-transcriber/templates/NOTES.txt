@@ -1,0 +1,31 @@
+local-transcriber (queue + KEDA) is installed as release "{{ .Release.Name }}".
+
+Components:
+  - API      {{ include "lt.api.fullname" . }}      (Service on port {{ .Values.api.service.port }})
+  - Worker   {{ include "lt.worker.fullname" . }}   (KEDA-scaled, starts at {{ if .Values.keda.enabled }}0{{ else }}{{ 1 }}{{ end }})
+  - Redis    {{ include "lt.redis.fullname" . }}    (broker + job state)
+
+1. Port-forward the API:
+   kubectl port-forward svc/{{ include "lt.api.fullname" . }} 8000:{{ .Values.api.service.port }}
+
+2. Open http://localhost:8000 and submit a file, or:
+   curl -F file=@clip.wav -F model=tiny http://localhost:8000/jobs
+
+3. Watch KEDA scale workers from zero on queue depth:
+   kubectl get pods -l app.kubernetes.io/component=worker -w
+   kubectl get scaledobject {{ include "lt.worker.fullname" . }}
+
+{{- if .Values.keda.enabled }}
+
+KEDA: workers scale 0 -> N on queue length and back to 0 after {{ .Values.keda.cooldownPeriod }}s idle.
+Make sure KEDA is installed (helm install keda kedacore/keda -n keda --create-namespace).
+{{- else }}
+
+KEDA is disabled (keda.enabled=false); the worker runs a single static replica.
+{{- end }}
+
+{{- if .Values.worker.gpu.enabled }}
+
+GPU mode is ENABLED in values. This path is documented but not tested in the demo
+cluster; it requires a GPU node, the NVIDIA device plugin, and the CUDA image.
+{{- end }}

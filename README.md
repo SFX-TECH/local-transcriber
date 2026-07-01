@@ -15,17 +15,29 @@ A premium, private alternative to tools like Otter.ai: a clean local web app tha
 transcribes your files with Whisper, plays them back in sync with the transcript,
 and exports to six formats. Everything runs on your machine.
 
+> **In plain terms:** This is a free app you run on your own computer that turns
+> recordings into written text. Because nothing is sent to the internet, your
+> private audio and video stay with you.
+
 ![Demo](assets/demo.gif)
 
 ---
 
 ## The problem
 
+> **In plain terms:** Most online transcription services limit how big your file
+> can be, charge for the best quality, and require you to hand your recordings to
+> their servers. That is a poor fit when the recording is long or private.
+
 Cloud transcription tools cap file size, hide the good models behind a paywall, and
 make you upload private recordings to someone else's server. For long talks, client
 calls, or anything sensitive, that is the wrong trade.
 
 ## What it does
+
+> **In plain terms:** You drag in a recording and get an editable, searchable
+> transcript that plays back in step with the audio, and you can save it in six
+> common file types. The original file is removed once the job finishes.
 
 - **Drag and drop** a video or audio file of **any length** (a 30-minute talk is fine).
 - Runs **OpenAI Whisper locally** (via `faster-whisper`) on your GPU when one is
@@ -44,6 +56,10 @@ calls, or anything sensitive, that is the wrong trade.
 
 ## How it works
 
+> **In plain terms:** The diagram below shows the path a file takes, from dropping
+> it in, to pulling out the sound, to writing the words, to the transcript you can
+> edit and export. All of it happens on your computer.
+
 ```mermaid
 flowchart LR
     UP["Drop video / audio<br/>(any length)"] --> FF["ffmpeg<br/>extract audio"]
@@ -59,6 +75,10 @@ entirely on your machine. Text exports are built in the browser (so they honor y
 edits); the Word export is built locally by the server with `python-docx`.
 
 ## Quickstart
+
+> **In plain terms:** These are the two ways to install and start the app, one for
+> Windows and one that works on any system. Pick whichever matches your setup and
+> follow the numbered steps.
 
 ### Windows (no Docker)
 
@@ -96,6 +116,10 @@ Models download once (Small ~0.5 GB, Large v3 ~3 GB) and are cached after that.
 
 ## Tech
 
+> **In plain terms:** This is the list of the main software pieces the app is built
+> from, grouped by the job each one does. It is here so engineers can see the parts
+> at a glance.
+
 | Layer | Stack |
 |---|---|
 | Server | Python 3.11 + FastAPI, server-sent events for live streaming |
@@ -105,6 +129,10 @@ Models download once (Small ~0.5 GB, Large v3 ~3 GB) and are cached after that.
 | Packaging | Docker (CPU and optional GPU), persistent model-cache volume |
 
 ## Testing
+
+> **In plain terms:** There is a quick built-in check you can run to confirm the
+> core pieces still work before you rely on the app. It finishes fast and needs no
+> internet.
 
 A fast, offline smoke test verifies the formatters and the real ffmpeg to
 faster-whisper pipeline:
@@ -117,9 +145,39 @@ See [`TESTING.md`](TESTING.md) for the full manual checklist.
 
 ## Status
 
+> **In plain terms:** This is a short, honest summary of how finished the project is
+> right now and what already works. It helps you know what to expect.
+
 Working, tested, and containerized. Runs fully offline once a model is cached.
 Light theme by default with an optional dark mode, synced playback, inline editing,
 search, and six export formats. CPU image verified; optional GPU image provided.
+
+## Scale it: Kubernetes + KEDA
+
+> **In plain terms:** This section describes a bigger setup for handling many
+> recordings, or several people submitting at once, where extra helpers start up only
+> when there is work and shut off when idle. The everyday app above does not need this.
+
+The single-process app above is one shape of this pipeline. For a backlog of long
+recordings, several people submitting at once, or a GPU you want to keep busy without
+paying for it while idle, there is a second shape: an async, queue-based service that
+autoscales Whisper workers **from zero** on queue depth and back to zero when quiet.
+
+```mermaid
+flowchart LR
+    C["Client"] --> API["transcriber-api<br/>(no inference)"]
+    API -->|"enqueue"| Q[("Redis queue")]
+    KEDA["KEDA"] -.->|"scale 0..N"| WK["worker pods<br/>faster-whisper"]
+    Q -->|"consume"| WK
+    WK -->|"artifacts"| ST[("Shared storage")]
+    API --> ST
+```
+
+Same `transcribe_core`, wrapped in a thin FastAPI, a Redis work queue, and a
+KEDA-scaled worker pool. Proven on Docker Desktop Kubernetes: zero to four workers
+and back to zero on queue depth, jobs transcribed and returned through the API. Try
+it with `make k8s-up && make demo`. Full writeup, chart, and the captured scaling
+proof are in [`deploy/README.md`](deploy/README.md).
 
 ## License
 

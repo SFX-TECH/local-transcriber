@@ -33,6 +33,8 @@ ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib:/u
 
 COPY app.py transcribe_core.py test_smoke.py ./
 COPY static ./static
+# Queue-based service (api + worker) for the Kubernetes GPU worker path.
+COPY service ./service
 
 ENV HF_HOME=/models
 ENV PYTHONUNBUFFERED=1

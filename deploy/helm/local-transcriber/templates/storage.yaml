@@ -1,0 +1,35 @@
+{{/* Shared inputs/outputs PVC (RWO is fine on a single node). */}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "lt.fullname" . }}-data
+  labels:
+    {{- include "lt.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.storage.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.size }}
+  {{- if .Values.storage.storageClass }}
+  storageClassName: {{ .Values.storage.storageClass | quote }}
+  {{- end }}
+{{- if .Values.modelCache.enabled }}
+---
+{{/* Whisper model cache PVC, so models download once and are reused. */}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "lt.fullname" . }}-models
+  labels:
+    {{- include "lt.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.modelCache.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.modelCache.size }}
+  {{- if .Values.modelCache.storageClass }}
+  storageClassName: {{ .Values.modelCache.storageClass | quote }}
+  {{- end }}
+{{- end }}

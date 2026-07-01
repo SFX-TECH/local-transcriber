@@ -1,0 +1,4 @@
+# Test-only dependencies (not shipped in the runtime images).
+# Install with: pip install -r requirements-cpu.txt -r requirements-dev.txt
+pytest==8.4.2
+fakeredis==2.36.2

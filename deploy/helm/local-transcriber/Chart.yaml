@@ -1,0 +1,20 @@
+apiVersion: v2
+name: local-transcriber
+description: >-
+  Queue-based, KEDA-autoscaled Whisper transcription service. An async,
+  horizontally scalable path next to the single-process local-transcriber app:
+  a thin API enqueues jobs onto Redis, and KEDA scales worker pods on queue
+  depth, down to zero when idle. Self-hosted, no cloud, no client data.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - whisper
+  - transcription
+  - kubernetes
+  - keda
+  - autoscaling
+home: https://github.com/SFX-TECH/local-transcriber
+maintainers:
+  - name: Jesse Jolly
+    url: https://linkedin.com/in/jessegjolly
