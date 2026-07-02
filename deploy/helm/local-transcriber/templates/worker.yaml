@@ -1,0 +1,74 @@
+{{- $gpu := .Values.worker.gpu -}}
+{{- $img := printf "%s:%s" .Values.image.repository .Values.image.tag -}}
+{{- if $gpu.enabled -}}
+{{- $img = printf "%s:%s" $gpu.image.repository $gpu.image.tag -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "lt.worker.fullname" . }}
+  labels:
+    {{- include "lt.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  # When KEDA is enabled it owns the replica count and starts the Deployment at
+  # zero, so the cluster truly idles at zero workers. Without KEDA, run one.
+  replicas: {{ if .Values.keda.enabled }}0{{ else }}1{{ end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "lt.labels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds }}
+      {{- if $gpu.enabled }}
+      {{- if $gpu.runtimeClassName }}
+      runtimeClassName: {{ $gpu.runtimeClassName }}
+      {{- end }}
+      {{- with $gpu.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $gpu.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ $img | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "service.worker"]
+          env:
+            {{- include "lt.commonEnv" . | nindent 12 }}
+            - name: WORKER_POLL_TIMEOUT
+              value: {{ .Values.worker.pollTimeout | quote }}
+          resources:
+            requests:
+              {{- toYaml .Values.worker.resources.requests | nindent 14 }}
+            limits:
+              {{- toYaml .Values.worker.resources.limits | nindent 14 }}
+              {{- if $gpu.enabled }}
+              # GPU mode: documented, not tested here (demo cluster has no GPU node).
+              nvidia.com/gpu: {{ $gpu.count }}
+              {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.env.sharedDir }}
+            - name: models
+              mountPath: {{ .Values.env.hfHome }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "lt.fullname" . }}-data
+        - name: models
+        {{- if .Values.modelCache.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "lt.fullname" . }}-models
+        {{- else }}
+          emptyDir: {}
+        {{- end }}

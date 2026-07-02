@@ -1,0 +1,98 @@
+# Default values for the local-transcriber chart.
+# Everything self-hosted and single-node friendly (Docker Desktop Kubernetes).
+
+# Container image. One image serves both the API and the worker; the command is
+# overridden per component. Built locally as local-transcriber:dev, so the
+# default pull policy is IfNotPresent (no registry needed for the demo).
+image:
+  repository: local-transcriber
+  tag: dev
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Shared env for api and worker.
+env:
+  sharedDir: /data        # inputs/outputs PVC mount
+  hfHome: /models         # Whisper model cache PVC mount
+
+# transcriber-api: the thin front door (no inference).
+api:
+  replicas: 1
+  port: 8000
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  ingress:
+    enabled: false
+    className: ""
+    host: transcriber.local
+    annotations: {}
+
+# transcriber-worker: runs Whisper. Replica count is owned by KEDA (see below);
+# the Deployment is created at 0 replicas so the cluster truly starts at zero.
+worker:
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "2", memory: 2Gi }
+  # Give a worker time to finish its current job when KEDA scales it down.
+  terminationGracePeriodSeconds: 120
+  # How long the worker blocks on the queue before re-checking the stop flag.
+  pollTimeout: 5
+
+  # GPU mode. DOCUMENTED, NOT TESTED here (the demo cluster has no GPU node).
+  # When enabled, the worker requests one GPU and is pinned to GPU nodes, and
+  # uses the CUDA image (build Dockerfile.gpu and push/tag it accordingly).
+  gpu:
+    enabled: false
+    image:
+      repository: local-transcriber-gpu
+      tag: dev
+    count: 1                 # becomes resources.limits["nvidia.com/gpu"]
+    runtimeClassName: ""     # e.g. "nvidia" if your cluster uses one
+    nodeSelector: {}         # e.g. { "nvidia.com/gpu.present": "true" }
+    tolerations: []          # e.g. taints on GPU nodes
+
+# In-chart Redis (broker + job state). Small and self-contained on purpose;
+# swap for a managed/Bitnami Redis in production.
+redis:
+  image: redis:7-alpine
+  port: 6379
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+
+# Shared storage for inputs and outputs. ReadWriteOnce is fine on a single node
+# (all pods land on the same node and can share it). For multi-node, switch to
+# ReadWriteMany backed by NFS or MinIO; documented in the README.
+storage:
+  size: 2Gi
+  accessMode: ReadWriteOnce
+  storageClass: ""
+
+# Whisper model cache so models are downloaded once, not per pod restart.
+modelCache:
+  enabled: true
+  size: 5Gi
+  accessMode: ReadWriteOnce
+  storageClass: ""
+
+# KEDA autoscaling. This is the headline learning artifact.
+# Requires KEDA installed in the cluster (helm install kedacore/keda).
+keda:
+  enabled: true
+  minReplicas: 0          # SCALE TO ZERO when the queue is empty (costs nothing idle)
+  maxReplicas: 5          # ceiling of concurrent workers
+  pollingInterval: 5      # seconds between Redis queue-length checks
+  cooldownPeriod: 30      # seconds the queue must stay empty before scaling toward zero
+  # Target Redis list length PER replica. With listLength=1, KEDA aims for one
+  # worker per queued job (so 5 queued jobs -> up to maxReplicas workers).
+  listLength: 1
