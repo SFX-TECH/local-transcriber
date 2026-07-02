@@ -176,8 +176,9 @@ flowchart LR
 Same `transcribe_core`, wrapped in a thin FastAPI, a Redis work queue, and a
 KEDA-scaled worker pool. Proven on Docker Desktop Kubernetes: zero to four workers
 and back to zero on queue depth, jobs transcribed and returned through the API. Try
-it with `make k8s-up && make demo`. Full writeup, chart, and the captured scaling
-proof are in [`deploy/README.md`](deploy/README.md).
+it with `make k8s-up && make demo`. No cluster? The same queue backend also runs on
+plain Docker with `make docker-queue` (API on `http://localhost:8001`). Full writeup,
+chart, and the captured scaling proof are in [`deploy/README.md`](deploy/README.md).
 
 ## License
 

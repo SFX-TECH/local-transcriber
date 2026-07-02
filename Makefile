@@ -1,10 +1,11 @@
 # local-transcriber on Kubernetes: one-command targets.
 # CPU mode on Docker Desktop Kubernetes (context docker-desktop) or kind.
 #
-#   make k8s-up     build the image, install KEDA, install the chart
-#   make demo       synthesize sample audio and submit jobs, watch scale-from-zero
-#   make status     show pods + the KEDA ScaledObject
-#   make k8s-down   uninstall the chart and its PVCs
+#   make k8s-up        build the image, install KEDA, install the chart
+#   make demo          synthesize sample audio and submit jobs, watch scale-from-zero
+#   make status        show pods + the KEDA ScaledObject
+#   make k8s-down      uninstall the chart and its PVCs
+#   make docker-queue  run the same queue backend on plain Docker (no cluster)
 
 IMAGE     ?= local-transcriber:dev
 RELEASE   ?= lt
@@ -13,11 +14,16 @@ CHART     ?= deploy/helm/local-transcriber
 JOBS      ?= 5
 MODEL     ?= tiny
 
-.PHONY: image keda-install chart k8s-up demo status logs k8s-down keda-uninstall
+.PHONY: image keda-install chart k8s-up demo status logs k8s-down keda-uninstall docker-queue
 
 ## Build the CPU image into the local Docker (Docker Desktop K8s reuses it).
 image:
 	docker build -t $(IMAGE) -f Dockerfile .
+
+## No cluster needed: run the same queue backend (Redis, API, worker) on plain
+## Docker. The queue API answers on http://localhost:8001.
+docker-queue:
+	docker compose --profile queue up --build
 
 ## For kind clusters only: load the image into the cluster.
 kind-load:
