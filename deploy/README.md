@@ -82,6 +82,28 @@ curl http://localhost:8000/jobs/<job_id>
 curl http://localhost:8000/jobs/<job_id>/artifacts/srt
 ```
 
+### No cluster? Run the queue backend on plain Docker
+
+No Kubernetes handy? The same queue backend (Redis, the API, and one worker) runs
+as an opt-in Docker Compose profile, sharing a data volume and the model cache:
+
+```bash
+make docker-queue                 # or: docker compose --profile queue up --build
+```
+
+The queue API then answers on <http://localhost:8001> (host 8001 maps to the
+container's 8000, so it never clashes with a `kubectl port-forward` on 8000).
+Submit and fetch jobs exactly as above, just against port 8001:
+
+```bash
+curl -F file=@clip.wav -F model=tiny -F language=en http://localhost:8001/jobs
+curl http://localhost:8001/jobs/<job_id>
+```
+
+This runs the same API and worker images the chart uses, just without the KEDA
+autoscaler (one fixed worker instead of zero to N). The plain `docker compose up`
+default is unchanged and still runs only the single-process app.
+
 ## What is in the chart
 
 | Component | Kind | Notes |
