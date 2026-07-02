@@ -47,5 +47,57 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
+  # Queue backend: the same Kubernetes topology (Redis broker, FastAPI queue
+  # API, one Whisper worker) on plain Docker, sharing a data volume and the
+  # model cache. This is an opt-in profile, so the default `docker compose up`
+  # above still runs only the interactive app.
+  #   docker compose --profile queue up --build
+  # The API then answers on http://localhost:8001 (host 8001 maps to container
+  # 8000, so it never clashes with a kubectl port-forward on 8000).
+  redis:
+    profiles: ["queue"]
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  api:
+    profiles: ["queue"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local-transcriber:cpu
+    command: ["python", "-m", "uvicorn", "service.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8001:8000"
+    environment:
+      - REDIS_HOST=redis
+      - SHARED_DIR=/data
+      - HF_HOME=/models
+    volumes:
+      - queue-data:/data
+      - model-cache:/models
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  worker:
+    profiles: ["queue"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local-transcriber:cpu
+    command: ["python", "-m", "service.worker"]
+    environment:
+      - REDIS_HOST=redis
+      - SHARED_DIR=/data
+      - HF_HOME=/models
+      - WORKER_POLL_TIMEOUT=5
+    volumes:
+      - queue-data:/data
+      - model-cache:/models
+    depends_on:
+      - redis
+    restart: unless-stopped
+
 volumes:
   model-cache:
+  queue-data:
