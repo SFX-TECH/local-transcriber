@@ -89,8 +89,20 @@ def queue_length(r) -> int:
 
 
 def dequeue(r, timeout: int = 5) -> Optional[str]:
-    """Blocking pop of the next job id (FIFO with LPUSH). None on timeout."""
-    res = r.brpop(QUEUE_KEY, timeout=timeout)
+    """Blocking pop of the next job id (FIFO with LPUSH). None when no job.
+
+    A blocking BRPOP normally returns None on timeout, but it can also surface
+    the wait as a redis TimeoutError, for example when SIGTERM interrupts the
+    socket read while KEDA is scaling the worker down. Treat that as "no job this
+    cycle" so the loop simply re-checks its stop flag and shuts down cleanly with
+    exit 0, instead of crashing with an unhandled exception (exit 1).
+    """
+    import redis
+
+    try:
+        res = r.brpop(QUEUE_KEY, timeout=timeout)
+    except redis.exceptions.TimeoutError:
+        return None
     return res[1] if res else None
 
 

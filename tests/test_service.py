@@ -71,6 +71,20 @@ def test_worker_missing_job(r):
     assert worker.process_job(r, "nope") == "missing"
 
 
+def test_dequeue_swallows_timeout():
+    """A blocking BRPOP that surfaces as a redis TimeoutError (for example when
+    SIGTERM interrupts the socket read while KEDA scales the worker down) is
+    treated as 'no job this cycle', so the worker loop re-checks its stop flag
+    and exits cleanly (exit 0) instead of crashing (exit 1, Error pod)."""
+    import redis
+
+    class _BrpopTimesOut:
+        def brpop(self, *args, **kwargs):
+            raise redis.exceptions.TimeoutError("Timeout reading from socket")
+
+    assert q.dequeue(_BrpopTimesOut(), timeout=1) is None
+
+
 def test_worker_process_job(r, shared):
     """Full path: enqueue, worker consumes, transcribes, writes 5 artifacts."""
     job_id = "job-unit-1"
