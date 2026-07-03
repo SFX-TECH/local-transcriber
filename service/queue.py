@@ -23,6 +23,9 @@ from typing import Optional
 
 QUEUE_KEY = "transcribe:queue"
 JOB_PREFIX = "transcribe:job:"
+EVENTS_PREFIX = "transcribe:events:"  # per-job live progress log (a Redis list)
+DEVICE_KEY = "transcribe:device"      # device note a worker reports on startup
+EVENTS_TTL = 3600                     # keep a job's event log for an hour
 
 # Artifacts the worker writes and the API serves. DOCX is intentionally left to
 # the interactive app; the service keeps the artifact set lean and text-only.
@@ -127,3 +130,31 @@ def set_result(r, job_id: str, segments, duration: float,
 def get_job(r, job_id: str) -> Optional[dict]:
     data = r.hgetall(job_key(job_id))
     return data or None
+
+
+# --- live progress log -------------------------------------------------------
+# A worker appends each transcribe event to a per-job Redis list; the API relays
+# that list over SSE. Using a list (not pub/sub) makes the stream race free: a
+# client that connects late still reads every event from the start.
+def events_key(job_id: str) -> str:
+    return EVENTS_PREFIX + job_id
+
+
+def push_event(r, job_id: str, event: dict) -> None:
+    key = events_key(job_id)
+    r.rpush(key, json.dumps(event))
+    r.expire(key, EVENTS_TTL)
+
+
+def read_events(r, job_id: str, start: int = 0) -> list:
+    """Return the job's events from index `start` onward, as dicts."""
+    raw = r.lrange(events_key(job_id), start, -1)
+    return [json.loads(x) for x in raw]
+
+
+def set_device_note(r, note: str) -> None:
+    r.set(DEVICE_KEY, note)
+
+
+def get_device_note(r) -> str:
+    return r.get(DEVICE_KEY) or ""
