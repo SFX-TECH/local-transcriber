@@ -146,6 +146,17 @@
               </div>
             </div>
 
+            <!-- AI insights (optional, via a local Ollama) -->
+            <section id="ai" class="card ai" hidden>
+              <div class="ai-head">
+                <span class="ai-title"><span class="spark" aria-hidden="true"></span>AI insights</span>
+                <select id="aiModel" class="ai-model" title="Local model" aria-label="Local model"></select>
+                <button id="aiGen" class="btn primary ai-gen">Generate</button>
+              </div>
+              <div id="aiNote" class="ai-note" hidden></div>
+              <div id="aiBody" class="ai-body" hidden></div>
+            </section>
+
             <div class="card result-body">
               <div class="rhead">
                 <h2 id="rtitle">Transcript</h2>

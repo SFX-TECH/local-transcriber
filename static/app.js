@@ -27,6 +27,8 @@ const transcriptEl = $("transcript");
 const searchEl = $("search"), searchCount = $("searchCount");
 const searchPrev = $("searchPrev"), searchNext = $("searchNext");
 const editToggle = $("editToggle"), copyBtn = $("copy"), copyTimesBtn = $("copyTimes");
+const aiCard = $("ai"), aiGenBtn = $("aiGen"), aiModelSel = $("aiModel");
+const aiNote = $("aiNote"), aiBody = $("aiBody");
 
 // --- state -------------------------------------------------------------------
 const jobs = new Map();   // id -> job
@@ -35,6 +37,7 @@ let staged = [];          // File[] waiting for the Transcribe click
 let activeMediaEl = null; // <audio>/<video> of the focused job
 let activeMediaURL = null;
 let activeIdx = -1;       // highlighted segment index in the focused player
+let aiStatus = null;      // /api/ai/status result (Ollama availability + models)
 
 // --- helpers -----------------------------------------------------------------
 function humanSize(b) {
@@ -426,6 +429,7 @@ function renderActive() {
   searchEl.value = job.searchQuery || "";
   runSearch(job.searchQuery || "");
 
+  renderAi(job);
   renderFocusLive(job);
 }
 
@@ -453,6 +457,7 @@ function renderFocusLive(job) {
     progPanel.hidden = false;
     toolbar.hidden = job.segments.length === 0;
   }
+  renderAi(job);
 }
 
 function renderStatusLine(job) {
@@ -714,3 +719,115 @@ function copyText(text, btn) {
 }
 copyBtn.addEventListener("click", () => { const j = jobs.get(activeId); if (j) copyText(buildTxt(plainSegments(j)), copyBtn); });
 copyTimesBtn.addEventListener("click", () => { const j = jobs.get(activeId); if (j) copyText(buildTextWithTimes(plainSegments(j)), copyTimesBtn); });
+
+// --- AI insights (focused job, optional via local Ollama) --------------------
+function parseClock(t) {
+  // "M:SS" or "H:MM:SS" -> seconds; NaN if unparseable
+  const parts = String(t || "").trim().split(":").map((n) => parseInt(n, 10));
+  if (!parts.length || parts.some((n) => isNaN(n))) return NaN;
+  return parts.reduce((acc, p) => acc * 60 + p, 0);
+}
+function populateAiModels() {
+  aiModelSel.innerHTML = "";
+  const models = (aiStatus && aiStatus.models) || [];
+  if (!models.length) {
+    const opt = document.createElement("option");
+    opt.value = ""; opt.textContent = "no model";
+    aiModelSel.appendChild(opt); aiModelSel.disabled = true; return;
+  }
+  aiModelSel.disabled = false;
+  models.forEach((m) => {
+    const opt = document.createElement("option");
+    opt.value = m; opt.textContent = m;
+    aiModelSel.appendChild(opt);
+  });
+  if (aiStatus.default) aiModelSel.value = aiStatus.default;
+}
+fetch("/api/ai/status").then((r) => r.json())
+  .then((d) => { aiStatus = d; populateAiModels(); })
+  .catch(() => { aiStatus = { available: false, models: [] }; populateAiModels(); });
+
+function showAiNote(html) { aiNote.innerHTML = html; aiNote.hidden = false; }
+function hideAiNote() { aiNote.hidden = true; aiNote.innerHTML = ""; }
+function aiUnavailableHtml() {
+  const where = aiStatus && aiStatus.base_url ? (" at <code>" + escapeHtml(aiStatus.base_url) + "</code>") : "";
+  return "Ollama is not running" + where + ". Start it with <code>ollama serve</code> and pull a model, " +
+    "for example <code>ollama pull qwen3:8b</code>, then reload the page.";
+}
+function aiLoading() { hideAiNote(); aiBody.hidden = false; aiBody.innerHTML = skeletonHTML(); }
+function hintToHtml(hint) {
+  // Turn 'command' quotes into <code> for readability.
+  return escapeHtml(hint).replace(/&#39;([^&]+?)&#39;|'([^']+?)'/g, (m, a, b) => "<code>" + (a || b) + "</code>");
+}
+function renderAiResult(ai) {
+  hideAiNote();
+  const chapters = ai.chapters || [], actions = ai.actions || [];
+  let html =
+    '<div class="ai-block"><div class="ai-label"><span class="spark"></span>Summary</div>' +
+    '<p class="ai-summary">' + escapeHtml(ai.summary || "") + "</p></div>" +
+    '<div class="ai-cols"><div class="ai-block">' +
+    '<div class="ai-label"><span class="spark"></span>Chapters</div><div class="ai-chapters">';
+  if (chapters.length) {
+    chapters.forEach((c) => {
+      html += '<div class="ai-chapter" data-t="' + escapeHtml(c.time || "") + '">' +
+        '<span class="ct">' + escapeHtml(c.time || "") + "</span>" +
+        '<span class="cl">' + escapeHtml(c.title || "") + "</span></div>";
+    });
+  } else { html += '<div class="ai-empty">No chapters.</div>'; }
+  html += "</div></div><div class=\"ai-block\">" +
+    '<div class="ai-label"><span class="spark"></span>Action items</div>';
+  if (actions.length) {
+    html += '<ul class="ai-actions">' + actions.map((a) => "<li>" + escapeHtml(a) + "</li>").join("") + "</ul>";
+  } else { html += '<div class="ai-empty">None.</div>'; }
+  html += "</div></div>";
+  aiBody.innerHTML = html;
+  aiBody.hidden = false;
+  aiBody.querySelectorAll(".ai-chapter").forEach((el) => {
+    el.addEventListener("click", () => { const s = parseClock(el.dataset.t); if (!isNaN(s)) seekTo(s); });
+  });
+}
+// Render the AI panel from the active job's state (called on rebuild + on done).
+function renderAi(job) {
+  if (!job || job.status !== "done" || !job.segments.length) { aiCard.hidden = true; return; }
+  aiCard.hidden = false;
+  aiGenBtn.disabled = job.aiState === "loading";
+  if (job.aiModel && [...aiModelSel.options].some((o) => o.value === job.aiModel)) aiModelSel.value = job.aiModel;
+  if (job.aiState === "loading") { aiLoading(); aiGenBtn.textContent = "Generating..."; return; }
+  if (job.ai) { renderAiResult(job.ai); aiGenBtn.textContent = "Regenerate"; return; }
+  aiBody.hidden = true; aiBody.innerHTML = "";
+  aiGenBtn.textContent = "Generate";
+  if (aiStatus && aiStatus.available === false) showAiNote(aiUnavailableHtml()); else hideAiNote();
+}
+async function generateAi() {
+  const job = jobs.get(activeId);
+  if (!job || job.status !== "done" || !job.segments.length) return;
+  const model = aiModelSel.value || "";
+  job.aiState = "loading";
+  aiLoading(); aiGenBtn.disabled = true; aiGenBtn.textContent = "Generating...";
+  try {
+    const res = await fetch("/api/ai/summarize", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ segments: plainSegments(job), model }),
+    });
+    const data = await res.json();
+    if (data && data.ok) {
+      job.ai = data; job.aiModel = data.model || model; job.aiState = "done";
+    } else {
+      job.aiState = "error"; job.aiError = (data && data.error) || "AI request failed.";
+      job.aiHint = data && data.hint ? data.hint : "";
+    }
+  } catch (e) {
+    job.aiState = "error"; job.aiError = "AI request failed: " + e.message; job.aiHint = "";
+  }
+  // Only touch the DOM if this job is still focused (the panel is shared).
+  if (activeId !== job.id) return;
+  aiGenBtn.disabled = false;
+  if (job.aiState === "done") { renderAiResult(job.ai); aiGenBtn.textContent = "Regenerate"; }
+  else {
+    aiBody.hidden = true; aiBody.innerHTML = "";
+    let msg = escapeHtml(job.aiError || "AI request failed.");
+    if (job.aiHint) msg += '<span class="ai-hint">' + hintToHtml(job.aiHint) + "</span>";
+    showAiNote(msg); aiGenBtn.textContent = "Try again";
+  }
+}
+aiGenBtn.addEventListener("click", generateAi);

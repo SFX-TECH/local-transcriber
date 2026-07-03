@@ -291,3 +291,45 @@ async def export_docx(req: _DocxRequest) -> Response:
         ),
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# --- AI insights (optional, via a local Ollama) ------------------------------
+# Summary, chapters, and action items for a finished transcript. This runs in the
+# API process (never the workers) and is entirely optional: if Ollama is not
+# reachable, the endpoints say so and the rest of the app is unaffected.
+class _SummarizeRequest(BaseModel):
+    segments: list[_ExportSegment]
+    model: str | None = None
+
+
+@app.get("/api/ai/status")
+async def ai_status() -> JSONResponse:
+    import ai_summary  # lazy: import is network-free; probe runs off the loop
+
+    loop = asyncio.get_event_loop()
+    return JSONResponse(await loop.run_in_executor(None, ai_summary.status))
+
+
+@app.post("/api/ai/summarize")
+async def ai_summarize(req: _SummarizeRequest) -> JSONResponse:
+    import ai_summary
+
+    loop = asyncio.get_event_loop()
+    st = await loop.run_in_executor(None, ai_summary.status)
+    if not st["available"]:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": st.get("error", "Ollama is not reachable."),
+                "hint": "Start Ollama (run 'ollama serve') and pull a model, e.g. 'ollama pull qwen3:8b'.",
+                "base_url": st.get("base_url", ""),
+            }
+        )
+    model = (req.model or st.get("default") or "").strip()
+    if not model:
+        return JSONResponse(
+            {"ok": False, "error": "No Ollama chat model is available.", "hint": "Pull one, e.g. 'ollama pull qwen3:8b'."}
+        )
+    segs = [s.model_dump() for s in req.segments]
+    result = await loop.run_in_executor(None, ai_summary.summarize, segs, model)
+    return JSONResponse(result)

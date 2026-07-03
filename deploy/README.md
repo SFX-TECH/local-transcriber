@@ -109,6 +109,13 @@ This runs the same API and worker images the chart uses, just without the KEDA
 autoscaler (one fixed worker instead of zero to N). The plain `docker compose up`
 default is unchanged and still runs only the single-process app.
 
+**Optional AI insights.** The compose profile points the API at an Ollama running
+on your host (`OLLAMA_HOST=host.docker.internal:11434`, model `qwen3:8b`), so the
+"AI insights" panel works from the containerized backend too. Start Ollama and
+pull a model (`ollama pull qwen3:8b`) to enable it; leave it off and the rest of
+the app is unaffected. Override `OLLAMA_HOST` / `OLLAMA_MODEL` in
+`docker-compose.yml` to point elsewhere.
+
 ## What is in the chart
 
 | Component | Kind | Notes |
