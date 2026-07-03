@@ -73,9 +73,12 @@ def _run_job(job_id: str, media_path: Path, model: str, language: str | None) ->
     q: queue.Queue = job["queue"]
     out_dir = OUTPUT / job_id
     out_dir.mkdir(parents=True, exist_ok=True)
+    detected = ""
     try:
         for event in core.transcribe(str(media_path), model_name=model, language=language):
-            if event["type"] == "done":
+            if event["type"] == "language":
+                detected = event.get("language", "")
+            elif event["type"] == "done":
                 segs = event["segments"]
                 job["segments"] = segs
                 job["duration"] = event["duration"]
@@ -85,6 +88,14 @@ def _run_job(job_id: str, media_path: Path, model: str, language: str | None) ->
                 (out_dir / f"{stem}.vtt").write_text(core.to_vtt(segs), encoding="utf-8")
                 job["stem"] = stem
                 job["status"] = "done"
+                # Record it in the persistent library (best-effort; never fatal).
+                try:
+                    import library
+
+                    library.add(job_id, job["name"], segs, duration=event["duration"],
+                                language=detected, model=model, source="app")
+                except Exception:  # noqa: BLE001
+                    pass
             elif event["type"] == "error":
                 job["status"] = "error"
             q.put(event)
@@ -328,3 +339,35 @@ async def ai_summarize(req: _SummarizeRequest) -> JSONResponse:
     segs = [s.model_dump() for s in req.segments]
     result = await loop.run_in_executor(None, ai_summary.summarize, segs, model)
     return JSONResponse(result)
+
+
+# --- transcript library ------------------------------------------------------
+# Every finished transcript is recorded locally so it can be browsed and searched
+# later, even across restarts. The store lives on disk (SQLite), fully local.
+@app.get("/api/library")
+async def library_list(q: str = "") -> JSONResponse:
+    import library
+
+    loop = asyncio.get_event_loop()
+    entries = await loop.run_in_executor(None, library.list_entries, q)
+    return JSONResponse({"entries": entries, "query": q})
+
+
+@app.get("/api/library/{item_id}")
+async def library_get(item_id: str) -> JSONResponse:
+    import library
+
+    loop = asyncio.get_event_loop()
+    item = await loop.run_in_executor(None, library.get, item_id)
+    if not item:
+        raise HTTPException(404, "Transcript not in the library.")
+    return JSONResponse(item)
+
+
+@app.delete("/api/library/{item_id}")
+async def library_delete(item_id: str) -> JSONResponse:
+    import library
+
+    loop = asyncio.get_event_loop()
+    ok = await loop.run_in_executor(None, library.delete, item_id)
+    return JSONResponse({"ok": ok})

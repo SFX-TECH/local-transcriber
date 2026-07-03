@@ -333,3 +333,35 @@ async def ai_summarize(req: _SummarizeRequest) -> JSONResponse:
     segs = [s.model_dump() for s in req.segments]
     result = await loop.run_in_executor(None, ai_summary.summarize, segs, model)
     return JSONResponse(result)
+
+
+# --- transcript library ------------------------------------------------------
+# The workers record every finished transcript into a SQLite store on the shared
+# volume; this API reads it so past transcripts can be browsed and searched.
+@app.get("/api/library")
+async def library_list(q: str = "") -> JSONResponse:
+    import library
+
+    loop = asyncio.get_event_loop()
+    entries = await loop.run_in_executor(None, library.list_entries, q)
+    return JSONResponse({"entries": entries, "query": q})
+
+
+@app.get("/api/library/{item_id}")
+async def library_get(item_id: str) -> JSONResponse:
+    import library
+
+    loop = asyncio.get_event_loop()
+    item = await loop.run_in_executor(None, library.get, item_id)
+    if not item:
+        raise HTTPException(404, "Transcript not in the library.")
+    return JSONResponse(item)
+
+
+@app.delete("/api/library/{item_id}")
+async def library_delete(item_id: str) -> JSONResponse:
+    import library
+
+    loop = asyncio.get_event_loop()
+    ok = await loop.run_in_executor(None, library.delete, item_id)
+    return JSONResponse({"ok": ok})

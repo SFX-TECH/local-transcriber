@@ -91,6 +91,14 @@ def process_job(r, job_id: str) -> str:
             artifacts[fmt] = str(path)
 
         q.set_result(r, job_id, segments, duration, detected, artifacts)
+        # Record it in the persistent library on the shared volume (best-effort).
+        try:
+            import library
+
+            library.add(job_id, job.get("name", "transcript"), segments, duration=duration,
+                        language=detected, model=model, source="queue")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[worker] library record skipped: {exc}", flush=True)
         q.push_event(r, job_id, {"type": "done", "segments": segments,
                                  "duration": duration, "detected": detected})
         print(f"[worker] job {job_id} done: {len(segments)} segment(s), "

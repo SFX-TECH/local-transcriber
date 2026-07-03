@@ -35,6 +35,7 @@
     </div>
     <div class="topbar-right">
       <span class="live" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+      <button id="libraryBtn" class="icon-btn" title="Browse and search all past transcripts">Library</button>
       <button id="addFiles" class="icon-btn" title="Add more audio or video files" hidden>Add files</button>
       <span id="devbadge" class="badge idle" title="Where transcription runs">checking hardware...</span>
       <button id="themeToggle" class="icon-btn" title="Switch theme" aria-label="Switch theme">Dark</button>
@@ -42,6 +43,24 @@
   </header>
 
   <main class="wrap">
+    <!-- Library: every past transcript, searchable across all of them -->
+    <section id="libraryView" class="library" hidden>
+      <div class="lib-head">
+        <h2 class="lib-title">Library</h2>
+        <div class="lib-search">
+          <svg class="search-ico" viewBox="0 0 24 24" width="16" height="16" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+          </svg>
+          <input id="libSearch" type="search" placeholder="Search all transcripts" autocomplete="off" />
+        </div>
+        <span id="libCount" class="lib-count"></span>
+        <button id="libClose" class="icon-btn" title="Close the library">Close</button>
+      </div>
+      <div id="libList" class="lib-list"></div>
+      <p id="libEmpty" class="lib-empty" hidden>No transcripts yet. Transcribe something and it will appear here.</p>
+    </section>
+
     <!-- Upload: accepts one or several files at once -->
     <section id="uploadCard" class="card upload">
       <div id="dropzone" class="dropzone" tabindex="0" role="button"

@@ -13,6 +13,8 @@ const $ = (id) => document.getElementById(id);
 // --- topbar / upload elements ------------------------------------------------
 const devBadge = $("devbadge"), themeToggle = $("themeToggle"), addFilesBtn = $("addFiles");
 const uploadCard = $("uploadCard");
+const libraryBtn = $("libraryBtn"), libraryView = $("libraryView"), libSearch = $("libSearch");
+const libCount = $("libCount"), libList = $("libList"), libEmpty = $("libEmpty"), libClose = $("libClose");
 const dz = $("dropzone"), fileInput = $("file"), chipsWrap = $("filechips");
 const go = $("go"), modelSel = $("model"), langSel = $("language");
 
@@ -831,3 +833,122 @@ async function generateAi() {
   }
 }
 aiGenBtn.addEventListener("click", generateAi);
+
+// --- transcript library + global search --------------------------------------
+function fmtDate(sec) {
+  try {
+    const d = new Date(sec * 1000);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
+      " " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  } catch (e) { return ""; }
+}
+function highlightSnippet(text, query) {
+  const esc = escapeHtml(text || "");
+  if (!query) return esc;
+  try {
+    const re = new RegExp("(" + escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+    return esc.replace(re, "<mark>$1</mark>");
+  } catch (e) { return esc; }
+}
+function openLibrary() {
+  libraryView.hidden = false;
+  workspace.hidden = true;
+  uploadCard.hidden = true;
+  addFilesBtn.hidden = true;
+  libSearch.value = "";
+  loadLibrary("");
+  libSearch.focus();
+}
+function closeLibrary() {
+  libraryView.hidden = true;
+  if (jobs.size > 0) { workspace.hidden = false; addFilesBtn.hidden = false; }
+  else { showUploadCard(true); }
+}
+async function loadLibrary(query) {
+  try {
+    const res = await fetch("/api/library" + (query ? ("?q=" + encodeURIComponent(query)) : ""));
+    const data = await res.json();
+    const entries = (data && data.entries) || [];
+    libCount.textContent = entries.length + (entries.length === 1 ? " transcript" : " transcripts");
+    renderLibraryList(entries, query);
+  } catch (e) {
+    libCount.textContent = ""; libList.innerHTML = "";
+    libEmpty.hidden = false; libEmpty.textContent = "Could not load the library.";
+  }
+}
+function renderLibraryList(entries, query) {
+  libList.innerHTML = "";
+  libEmpty.hidden = entries.length > 0;
+  if (!entries.length) {
+    libEmpty.textContent = query
+      ? ("No transcripts match “" + query + "”.")
+      : "No transcripts yet. Transcribe something and it will appear here.";
+    return;
+  }
+  entries.forEach((e) => {
+    const meta = [fmtDate(e.created_at)];
+    if (e.duration) meta.push(mmss(e.duration));
+    if (e.language) meta.push(String(e.language).toUpperCase());
+    if (e.model) meta.push(e.model);
+    meta.push(e.segment_count + " seg");
+
+    const card = document.createElement("div");
+    card.className = "lib-card";
+    card.innerHTML =
+      '<div class="lib-card-top"><span class="lib-card-name"></span></div>' +
+      '<div class="lib-card-meta"></div>' +
+      '<p class="lib-card-snippet"></p>' +
+      '<button class="lib-del" title="Remove from the library">Delete</button>';
+    card.querySelector(".lib-card-name").textContent = e.name;
+    const metaEl = card.querySelector(".lib-card-meta");
+    meta.forEach((m) => { const s = document.createElement("span"); s.textContent = m; metaEl.appendChild(s); });
+    card.querySelector(".lib-card-snippet").innerHTML = highlightSnippet(e.snippet || "", query);
+    card.addEventListener("click", (ev) => {
+      if (ev.target.classList.contains("lib-del")) return;
+      openLibraryItem(e.id);
+    });
+    card.querySelector(".lib-del").addEventListener("click", (ev) => { ev.stopPropagation(); deleteLibraryItem(e.id); });
+    libList.appendChild(card);
+  });
+}
+async function openLibraryItem(id) {
+  const jid = "lib:" + id;
+  if (jobs.has(jid)) { closeLibrary(); workspace.hidden = false; setActive(jid); return; }
+  let d;
+  try {
+    const res = await fetch("/api/library/" + encodeURIComponent(id));
+    if (!res.ok) throw new Error("not found");
+    d = await res.json();
+  } catch (e) { toast("Could not open that transcript.", true); return; }
+  const job = {
+    id: jid, file: null, name: d.name || "transcript", model: d.model || "", lang: d.language || "",
+    status: "done", segments: (d.segments || []).map((s) => ({ start: s.start, end: s.end, text: s.text })),
+    duration: d.duration || 0, detectedLang: d.language || "", device: "",
+    progress: 1, startedAt: 0, finishedInMs: 0, es: null, errorMsg: "",
+    editing: false, searchQuery: "", tabEl: null, railEl: null, fromLibrary: true,
+  };
+  jobs.set(jid, job);
+  addTabAndRail(job);
+  closeLibrary();
+  workspace.hidden = false;
+  showUploadCard(false);
+  setActive(jid);
+  updateRailCount();
+}
+async function deleteLibraryItem(id) {
+  try {
+    const res = await fetch("/api/library/" + encodeURIComponent(id), { method: "DELETE" });
+    if (!res.ok) throw new Error("failed");
+  } catch (e) { toast("Delete failed.", true); return; }
+  const jid = "lib:" + id;
+  if (jobs.has(jid)) closeJob(jid);
+  loadLibrary(libSearch.value.trim());
+  toast("Removed from the library.");
+}
+let libSearchTimer = null;
+libSearch.addEventListener("input", () => {
+  clearTimeout(libSearchTimer);
+  libSearchTimer = setTimeout(() => loadLibrary(libSearch.value.trim()), 220);
+});
+libraryBtn.addEventListener("click", () => { if (libraryView.hidden) openLibrary(); else closeLibrary(); });
+libClose.addEventListener("click", closeLibrary);
