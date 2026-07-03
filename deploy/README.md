@@ -82,6 +82,11 @@ curl http://localhost:8000/jobs/<job_id>
 curl http://localhost:8000/jobs/<job_id>/artifacts/srt
 ```
 
+Or open <http://localhost:8000> in a browser: the API serves the same premium
+web UI as the single-process app. Drag in several files and each opens in its
+own tab, streaming live as KEDA scales workers up to transcribe them and back to
+zero when the queue drains.
+
 ### No cluster? Run the queue backend on plain Docker
 
 No Kubernetes handy? The same queue backend (Redis, the API, and one worker) runs
@@ -108,7 +113,7 @@ default is unchanged and still runs only the single-process app.
 
 | Component | Kind | Notes |
 |---|---|---|
-| `transcriber-api` | Deployment + Service | Thin FastAPI. Enqueues jobs, serves status and artifacts. No inference. |
+| `transcriber-api` | Deployment + Service | Thin FastAPI. Serves the premium web UI, enqueues jobs, relays live worker progress over SSE, serves status and artifacts. No inference. |
 | `transcriber-worker` | Deployment (KEDA scaled) | Consumes the queue, runs `transcribe_core.transcribe()`, writes five artifacts. Starts at 0 replicas. |
 | Redis | Deployment + PVC | Broker (the work queue) and job state (one hash per job). |
 | Shared storage | PVC (ReadWriteOnce) | `inputs/` and `outputs/` shared by API and workers. |

@@ -46,6 +46,9 @@ def process_job(r, job_id: str) -> str:
         return "missing"
 
     q.set_status(r, job_id, "running", started=time.time())
+    # Live progress: the API relays this per-job event log over SSE, so the web
+    # UI streams exactly like the single-process app does.
+    q.push_event(r, job_id, {"type": "status", "message": "Starting..."})
     input_path = job.get("input_path")
     model = job.get("model", "small")
     language = job.get("language", "auto")
@@ -57,10 +60,14 @@ def process_job(r, job_id: str) -> str:
         detected = ""
         for ev in core.transcribe(input_path, model_name=model, language=lang):
             kind = ev.get("type")
-            if kind == "language":
+            if kind == "status":
+                q.push_event(r, job_id, ev)
+            elif kind == "language":
                 detected = ev.get("language", "")
+                q.push_event(r, job_id, ev)
             elif kind == "segment":
                 segments.append({"start": ev["start"], "end": ev["end"], "text": ev["text"]})
+                q.push_event(r, job_id, ev)
             elif kind == "done":
                 segments = ev["segments"]
                 duration = ev.get("duration", 0.0)
@@ -84,18 +91,27 @@ def process_job(r, job_id: str) -> str:
             artifacts[fmt] = str(path)
 
         q.set_result(r, job_id, segments, duration, detected, artifacts)
+        q.push_event(r, job_id, {"type": "done", "segments": segments,
+                                 "duration": duration, "detected": detected})
         print(f"[worker] job {job_id} done: {len(segments)} segment(s), "
               f"{duration:.1f}s audio", flush=True)
         return "done"
     except Exception as exc:  # noqa: BLE001
-        q.set_status(r, job_id, "error", error=f"{type(exc).__name__}: {exc}")
+        msg = f"{type(exc).__name__}: {exc}"
+        q.set_status(r, job_id, "error", error=msg)
+        q.push_event(r, job_id, {"type": "error", "message": msg})
         print(f"[worker] job {job_id} error: {exc}", flush=True)
         return "error"
 
 
 def run(poll_timeout: int = 5) -> None:
     r = q.get_redis()
-    print(f"[worker] started, waiting for jobs ({core.resolve_device()[2]})", flush=True)
+    note = core.resolve_device()[2]
+    try:
+        q.set_device_note(r, note)  # so the web UI can show a GPU/CPU badge
+    except Exception:  # noqa: BLE001
+        pass
+    print(f"[worker] started, waiting for jobs ({note})", flush=True)
     while not _STOP:
         job_id = q.dequeue(r, timeout=poll_timeout)
         if job_id is None:
