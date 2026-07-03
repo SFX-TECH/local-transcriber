@@ -72,6 +72,12 @@ services:
       - REDIS_HOST=redis
       - SHARED_DIR=/data
       - HF_HOME=/models
+      # Reach a local Ollama running on the host for optional AI insights.
+      # Override OLLAMA_MODEL to pick a different pulled model.
+      - OLLAMA_HOST=host.docker.internal:11434
+      - OLLAMA_MODEL=qwen3:8b
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - queue-data:/data
       - model-cache:/models

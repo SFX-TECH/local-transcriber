@@ -24,7 +24,7 @@ COPY requirements-cpu.txt .
 RUN pip install --no-cache-dir -r requirements-cpu.txt
 
 # Application code (kept minimal; see .dockerignore).
-COPY app.py transcribe_core.py test_smoke.py ./
+COPY app.py transcribe_core.py ai_summary.py test_smoke.py ./
 COPY static ./static
 # Queue-based service (api + worker) for the Kubernetes path.
 COPY service ./service
