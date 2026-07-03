@@ -262,7 +262,7 @@ function handleEvent(job, ev) {
     if (!job.startedAt) job.startedAt = Date.now();
     job.status = "running";
     job.progress = ev.progress || 0;
-    const seg = { start: ev.start, end: ev.end, text: ev.text };
+    const seg = { start: ev.start, end: ev.end, text: ev.text, words: ev.words || [] };
     job.segments.push(seg);
     if (job.id === activeId) appendSegmentDOM(job, seg);
   } else if (ev.type === "done") {
@@ -271,7 +271,7 @@ function handleEvent(job, ev) {
     if (ev.duration) job.duration = ev.duration;
     if (job.startedAt) job.finishedInMs = Date.now() - job.startedAt;
     if (Array.isArray(ev.segments) && ev.segments.length && !job.segments.length) {
-      job.segments = ev.segments.map((s) => ({ start: s.start, end: s.end, text: s.text }));
+      job.segments = ev.segments.map((s) => ({ start: s.start, end: s.end, text: s.text, words: s.words || [] }));
     }
     if (job.tabEl) {
       job.tabEl.classList.add("just-done");
@@ -405,6 +405,7 @@ function renderActive() {
   // tear down previous player
   if (activeMediaURL) { URL.revokeObjectURL(activeMediaURL); activeMediaURL = null; }
   playerWrap.innerHTML = ""; playerWrap.hidden = true; activeMediaEl = null; activeIdx = -1;
+  curWordEl = null;
   transcriptEl.innerHTML = ""; transcriptEl.classList.remove("editing");
   if (!job) { resultEl.hidden = true; progPanel.hidden = true; return; }
 
@@ -503,19 +504,37 @@ function skeletonHTML() {
     '<div class="sk-lines"><div class="sk-line"></div><div class="sk-line short"></div></div></div>';
   return '<div class="skeleton" aria-hidden="true">' + row + row + row + "</div>";
 }
+// Fill a segment's text node. When idle it renders one span per word so the
+// current word can be highlighted during playback; while editing or searching it
+// falls back to plain text (search paints its own <mark>s over the top).
+function paintSegText(seg, job) {
+  const el = seg.textEl;
+  if (!el) return;
+  const searching = !!(job.searchQuery && job.searchQuery.trim());
+  if (job.editing || searching || !(seg.words && seg.words.length)) {
+    el.textContent = seg.text;
+    seg.wordEls = null;
+    return;
+  }
+  el.innerHTML = seg.words
+    .map((w, i) => '<span class="w" data-wi="' + i + '">' + escapeHtml(w.word) + "</span>")
+    .join("");
+  seg.wordEls = Array.prototype.slice.call(el.querySelectorAll(".w"));
+}
 function makeSegEl(job, seg) {
   const row = document.createElement("div");
   row.className = "seg";
   const t = document.createElement("span");
   t.className = "t"; t.textContent = mmss(seg.start); t.title = "Jump to " + mmss(seg.start);
   const text = document.createElement("span");
-  text.className = "seg-text"; text.textContent = seg.text;
+  text.className = "seg-text";
   text.contentEditable = job.editing ? "true" : "false";
   row.appendChild(t); row.appendChild(text);
+  seg.el = row; seg.textEl = text;
+  paintSegText(seg, job);
   t.addEventListener("click", (e) => { e.stopPropagation(); seekTo(seg.start); });
   row.addEventListener("click", () => { if (!job.editing) seekTo(seg.start); });
   text.addEventListener("input", () => { seg.text = text.textContent; });
-  seg.el = row; seg.textEl = text;
   return row;
 }
 function appendSegmentDOM(job, seg) {
@@ -555,6 +574,23 @@ function seekTo(t) {
   if (!activeMediaEl) return;
   try { activeMediaEl.currentTime = Math.max(0, t); activeMediaEl.play().catch(() => {}); } catch (e) {}
 }
+let curWordEl = null;  // the word span currently lit for karaoke
+function highlightWord(job, segIdx, t) {
+  const seg = segIdx >= 0 ? job.segments[segIdx] : null;
+  let el = null;
+  if (seg && seg.wordEls && seg.words && seg.words.length) {
+    let wi = -1;
+    for (let i = 0; i < seg.words.length; i++) {
+      if (seg.words[i].start <= t + 0.05) wi = i; else break;
+    }
+    // drop the highlight once we are clearly past the last spoken word
+    if (wi >= 0 && t <= seg.words[wi].end + 0.4) el = seg.wordEls[wi];
+  }
+  if (el === curWordEl) return;
+  if (curWordEl) curWordEl.classList.remove("wnow");
+  curWordEl = el;
+  if (el) el.classList.add("wnow");
+}
 function onTimeUpdate() {
   const job = jobs.get(activeId);
   if (!activeMediaEl || !job || !job.segments.length) return;
@@ -563,6 +599,7 @@ function onTimeUpdate() {
   for (let i = 0; i < job.segments.length; i++) {
     if (job.segments[i].start <= t + 0.001) idx = i; else break;
   }
+  highlightWord(job, idx, t);  // per-word karaoke, updates even within one segment
   if (idx === activeIdx) return;
   if (activeIdx >= 0 && job.segments[activeIdx] && job.segments[activeIdx].el) job.segments[activeIdx].el.classList.remove("active");
   activeIdx = idx;
@@ -575,7 +612,8 @@ function onTimeUpdate() {
 // --- search (focused job) ----------------------------------------------------
 let matches = [], matchIndex = -1;
 function clearHighlights(job) {
-  job.segments.forEach((s) => { if (s.textEl) s.textEl.textContent = s.text; });
+  if (curWordEl) { curWordEl.classList.remove("wnow"); curWordEl = null; }
+  job.segments.forEach((s) => { if (s.textEl) paintSegText(s, job); });
   matches = []; matchIndex = -1;
 }
 function runSearch(q) {
@@ -631,7 +669,9 @@ editToggle.addEventListener("click", () => {
   editToggle.textContent = job.editing ? "Done" : "Edit";
   transcriptEl.classList.toggle("editing", job.editing);
   if (job.editing && searchEl.value) { searchEl.value = ""; runSearch(""); }
-  job.segments.forEach((s) => { if (s.textEl) s.textEl.contentEditable = job.editing ? "true" : "false"; });
+  job.segments.forEach((s) => {
+    if (s.textEl) { s.textEl.contentEditable = job.editing ? "true" : "false"; paintSegText(s, job); }
+  });
 });
 
 // --- exports + copy (focused job) --------------------------------------------
@@ -922,7 +962,7 @@ async function openLibraryItem(id) {
   } catch (e) { toast("Could not open that transcript.", true); return; }
   const job = {
     id: jid, file: null, name: d.name || "transcript", model: d.model || "", lang: d.language || "",
-    status: "done", segments: (d.segments || []).map((s) => ({ start: s.start, end: s.end, text: s.text })),
+    status: "done", segments: (d.segments || []).map((s) => ({ start: s.start, end: s.end, text: s.text, words: s.words || [] })),
     duration: d.duration || 0, detectedLang: d.language || "", device: "",
     progress: 1, startedAt: 0, finishedInMs: 0, es: null, errorMsg: "",
     editing: false, searchQuery: "", tabEl: null, railEl: null, fromLibrary: true,

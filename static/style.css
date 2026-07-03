@@ -310,6 +310,8 @@ body.busy .live{display:inline-flex}
   flex:0 0 auto;min-width:46px;font-weight:700;user-select:none;padding-top:1px;
 }
 .transcript .seg .seg-text{flex:1;color:var(--text);outline:none}
+.transcript .seg .w{border-radius:4px;transition:background .08s var(--ease),color .08s var(--ease)}
+.transcript .seg .w.wnow{background:var(--accent-weak);color:var(--accent);box-shadow:0 0 0 1px var(--accent-ring),var(--glow)}
 .transcript.editing{cursor:text}
 .transcript.editing .seg{cursor:text}
 .transcript.editing .seg .seg-text{

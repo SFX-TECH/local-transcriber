@@ -48,8 +48,9 @@ calls, or anything sensitive, that is the wrong trade.
   CPU automatically.
 - **Live transcript** streams in as it runs, with a progress bar, time estimate, and
   a GPU/CPU badge.
-- **Synced media player**: the file plays back in the browser and the current line
-  highlights as it goes. Click any line to jump there.
+- **Synced media player** with **word-level karaoke**: the file plays back in the
+  browser and the current line highlights as it goes, with the exact word lighting
+  up in time with the audio. Click any line to jump there.
 - **Edit** the transcript inline, **search** it with highlighting, and **copy** it
   with or without timestamps.
 - **Export** to plain text (`.txt`), subtitles (`.srt`), web captions (`.vtt`),
