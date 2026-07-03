@@ -12,6 +12,8 @@ __pycache__/
 # App runtime data (all local, never committed)
 output/
 uploads/
+/library/
+*.db
 
 # Model caches (Whisper / HuggingFace / CTranslate2)
 models/
