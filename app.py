@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import queue
 import re
 import shutil
@@ -42,6 +43,13 @@ app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 # In-memory job table (single-user local app).
 JOBS: dict[str, dict] = {}
 _DONE = object()  # sentinel pushed onto a job queue when finished
+
+# Bounded worker pool: at most MAX_CONCURRENT transcriptions run at once; the
+# rest wait in _pending and start as slots free. Two concurrent CPU jobs share
+# the same cores, so the default is deliberately small. Set MAX_CONCURRENT=1 for
+# strictly sequential, or higher on a strong GPU box.
+MAX_CONCURRENT = max(1, int(os.environ.get("MAX_CONCURRENT", "2")))
+_pending: "queue.Queue[str]" = queue.Queue()
 
 # File-type validation. We do not maintain an exhaustive allow-list (ffmpeg
 # reads far more than we could enumerate); instead we fast-reject the obvious
@@ -91,6 +99,28 @@ def _run_job(job_id: str, media_path: Path, model: str, language: str | None) ->
             media_path.parent.rmdir()  # remove now-empty uploads/<job_id>/
         except OSError:
             pass
+
+
+def _worker_loop() -> None:
+    """One pool worker: pull the next queued job and run it to completion.
+
+    A slot is held for the whole transcription, so at most MAX_CONCURRENT jobs
+    run at once and the rest stay 'queued' until a worker frees up.
+    """
+    while True:
+        job_id = _pending.get()
+        job = JOBS.get(job_id)
+        if job is None:
+            continue
+        job["status"] = "running"
+        # Nudge the stream so the tab flips from queued to running promptly,
+        # even before the (possibly slow) model load emits its first status.
+        job["queue"].put({"type": "status", "message": "Starting..."})
+        _run_job(job_id, job["_media_path"], job["_model"], job["_lang"])
+
+
+for _ in range(MAX_CONCURRENT):
+    threading.Thread(target=_worker_loop, daemon=True).start()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -145,17 +175,22 @@ async def create_job(
         raise HTTPException(400, "That file is empty (0 bytes).")
 
     lang = None if language in ("auto", "", None) else language
+    jq: queue.Queue = queue.Queue()
     JOBS[job_id] = {
-        "queue": queue.Queue(),
-        "status": "running",
+        "queue": jq,
+        "status": "queued",
         "name": safe_name,
         "segments": [],
         "duration": 0.0,
         "stem": _safe_stem(safe_name),
+        # stashed so a pool worker can run it when a slot frees up
+        "_media_path": media_path,
+        "_model": model,
+        "_lang": lang,
     }
-    threading.Thread(
-        target=_run_job, args=(job_id, media_path, model, lang), daemon=True
-    ).start()
+    # Announce the wait immediately; a pool worker flips it to running.
+    jq.put({"type": "queued"})
+    _pending.put(job_id)
     return JSONResponse({"job_id": job_id, "size": size, "name": safe_name})
 
 

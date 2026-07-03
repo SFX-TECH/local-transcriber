@@ -57,7 +57,7 @@ body{
 .icon-btn:hover{border-color:var(--border-strong)}
 
 /* Layout */
-.wrap{max-width:920px;margin:0 auto;padding:26px 22px 90px;display:flex;flex-direction:column;gap:18px}
+.wrap{max-width:1000px;margin:0 auto;padding:26px 22px 90px;display:flex;flex-direction:column;gap:18px}
 .card{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:var(--shadow);
@@ -103,6 +103,66 @@ body{
   border-radius:50%;cursor:pointer;font-size:15px;line-height:1;
 }
 .fc-x:hover{color:var(--danger)}
+.filechips{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.filechips .filechip{margin-top:0}
+
+/* Workspace: tabs + focused view + status rail */
+.workspace{display:flex;flex-direction:column;gap:14px}
+.tabbar{display:flex;gap:8px;flex-wrap:wrap}
+.tab{
+  display:inline-flex;align-items:center;gap:8px;max-width:260px;
+  background:var(--surface);border:1px solid var(--border);border-radius:999px;
+  padding:7px 8px 7px 12px;font-size:13px;font-weight:600;color:var(--muted);
+  cursor:pointer;transition:background .12s,border-color .12s,color .12s;
+}
+.tab:hover{border-color:var(--border-strong)}
+.tab.active{background:var(--accent-weak);border-color:var(--accent);color:var(--accent)}
+.tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px}
+.tab-pct{font-size:11px;font-variant-numeric:tabular-nums;color:var(--faint)}
+.tab.active .tab-pct{color:var(--accent)}
+.tab-x{
+  width:18px;height:18px;border-radius:50%;display:grid;place-items:center;
+  color:var(--faint);font-size:14px;line-height:1;flex:0 0 auto;
+}
+.tab-x:hover{background:var(--surface-2);color:var(--danger)}
+
+.workspace-body{display:flex;gap:16px;align-items:flex-start}
+.focus{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:14px}
+
+.rail{
+  flex:0 0 220px;position:sticky;top:80px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:12px;max-height:calc(100vh - 104px);overflow:auto;
+}
+.rail-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;
+}
+.rail-count{color:var(--faint);font-weight:600;font-size:11px}
+.rail-list{display:flex;flex-direction:column;gap:8px}
+.rail-row{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;
+  padding:8px 10px;border:1px solid var(--border);border-radius:10px;
+  background:var(--inset);cursor:pointer;transition:background .12s,border-color .12s;
+}
+.rail-row:hover{border-color:var(--border-strong)}
+.rail-row.active{border-color:var(--accent);background:var(--accent-weak)}
+.rail-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:600}
+.rail-bar{flex:1 1 100%;order:2;height:6px;background:var(--surface-2);border-radius:999px;overflow:hidden}
+.rail-fill{display:block;height:100%;width:0;border-radius:999px;transition:width .25s;
+  background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.rail-meta{flex:1 1 100%;order:3;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Shared status dot for tabs and rail rows */
+.tab-dot,.rail-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--faint)}
+.tab[data-status="queued"] .tab-dot,.rail-row[data-status="queued"] .rail-dot{background:var(--faint)}
+.tab[data-status="uploading"] .tab-dot,.rail-row[data-status="uploading"] .rail-dot,
+.tab[data-status="running"] .tab-dot,.rail-row[data-status="running"] .rail-dot{
+  background:var(--accent);animation:pulse 1.2s ease-in-out infinite;
+}
+.tab[data-status="done"] .tab-dot,.rail-row[data-status="done"] .rail-dot{background:var(--good-tx)}
+.tab[data-status="error"] .tab-dot,.rail-row[data-status="error"] .rail-dot{background:var(--danger)}
+.rail-row[data-status="done"] .rail-fill{background:var(--good-tx)}
 
 /* Controls + buttons */
 .controls{display:flex;gap:14px;align-items:flex-end;margin-top:18px;flex-wrap:wrap}
@@ -204,6 +264,10 @@ body{
 .err{color:var(--danger);font-weight:600}
 
 /* Responsive */
+@media (max-width:820px){
+  .workspace-body{flex-direction:column}
+  .rail{flex-basis:auto;width:100%;position:static;max-height:none;order:-1}
+}
 @media (max-width:640px){
   .topbar{padding:12px 16px}
   .brand-tag{display:none}
