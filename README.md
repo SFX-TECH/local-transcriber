@@ -9,17 +9,51 @@
 ![Docker](https://img.shields.io/badge/Docker-ready-000000)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Jesse%20Jolly-0a66c2)](https://linkedin.com/in/jessegjolly)
 
-![Local Transcriber](assets/screenshot.png)
+<p align="center">
+  <img src="assets/screenshot.png" alt="Local Transcriber in Studio Dark: multi-file tabs, AI insights, and a word-synced transcript" width="900" />
+</p>
 
 A premium, private alternative to tools like Otter.ai: a clean local web app that
-transcribes your files with Whisper, plays them back in sync with the transcript,
-and exports to six formats. Everything runs on your machine.
+transcribes your files with Whisper, plays them back in sync down to the word,
+summarizes them with a local LLM, and keeps every transcript in a searchable
+library. Everything runs on your machine.
 
 > **In plain terms:** This is a free app you run on your own computer that turns
-> recordings into written text. Because nothing is sent to the internet, your
-> private audio and video stay with you.
+> recordings into written text, then helps you read, search, and summarize them.
+> Because nothing is sent to the internet, your private audio and video stay with you.
 
-![Demo](assets/demo.gif)
+<p align="center">
+  <img src="assets/demo.gif" alt="Word-level karaoke: each word highlights in time with the audio" width="720" />
+  <br />
+  <em>Word-level karaoke: the transcript lights up word by word, in time with the audio.</em>
+</p>
+
+### One app, two moods
+
+A single identity in two themes: Editorial Light by day, Studio Dark by night.
+The brand indigo carries the design; a live cyan accent marks anything in motion.
+
+<p align="center">
+  <img src="assets/hero-light.png" alt="Local Transcriber in Editorial Light" width="880" />
+</p>
+
+### Local AI insights and a searchable library
+
+Every finished transcript gets an optional one-click summary, chapters, and action
+items from a local Ollama model, and is saved to a library you can search across.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="assets/library.png" alt="A searchable library of every past transcript" /><br />
+      <em>A local library of every transcript, searchable across all of them.</em>
+    </td>
+    <td width="50%" valign="top">
+      <img src="assets/upload.png" alt="Drop one or several files to transcribe at once" /><br />
+      <em>Drop one or several files and transcribe them at once.</em>
+    </td>
+  </tr>
+</table>
 
 ---
 
