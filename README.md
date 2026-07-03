@@ -40,6 +40,9 @@ calls, or anything sensitive, that is the wrong trade.
 > common file types. The original file is removed once the job finishes.
 
 - **Drag and drop** a video or audio file of **any length** (a 30-minute talk is fine).
+- **Transcribe several at once**: drop a batch and each file opens in its own tab,
+  with a status rail showing every job. A small worker pool runs them a few at a
+  time and queues the rest (tune it with `MAX_CONCURRENT`, default 2).
 - Runs **OpenAI Whisper locally** (via `faster-whisper`) on your GPU when one is
   available (a 30-minute file can finish in a couple of minutes), and falls back to
   CPU automatically.
