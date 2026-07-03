@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Local Transcriber</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%234f46e5'/><text x='16' y='23' font-size='15' font-family='sans-serif' font-weight='700' fill='%23ffffff' text-anchor='middle'>LT</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'><stop offset='0' stop-color='%236366f1'/><stop offset='.55' stop-color='%234f46e5'/><stop offset='1' stop-color='%2322d3ee'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><g fill='%23ffffff'><rect x='5.5' y='13' width='3' height='6' rx='1.5'/><rect x='10' y='9.5' width='3' height='13' rx='1.5'/><rect x='14.5' y='7' width='3' height='18' rx='1.5'/><rect x='19' y='10.5' width='3' height='11' rx='1.5'/><rect x='23.5' y='13.5' width='3' height='5' rx='1.5'/></g></svg>" />
   <link rel="stylesheet" href="/static/style.css" />
   <script>
     // Apply saved theme before first paint (light is the default).
@@ -19,13 +19,22 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <div class="logo">LT</div>
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="#fff">
+          <rect x="5.5" y="13" width="3" height="6" rx="1.5" />
+          <rect x="10" y="9.5" width="3" height="13" rx="1.5" />
+          <rect x="14.5" y="7" width="3" height="18" rx="1.5" />
+          <rect x="19" y="10.5" width="3" height="11" rx="1.5" />
+          <rect x="23.5" y="13.5" width="3" height="5" rx="1.5" />
+        </svg>
+      </div>
       <div class="brand-text">
-        <span class="brand-name">Local Transcriber</span>
+        <span class="brand-name">Local Transcriber<span class="dot">.</span></span>
         <span class="brand-tag">Private, on-device transcription</span>
       </div>
     </div>
     <div class="topbar-right">
+      <span class="live" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       <button id="addFiles" class="icon-btn" title="Add more audio or video files" hidden>Add files</button>
       <span id="devbadge" class="badge idle" title="Where transcription runs">checking hardware...</span>
       <button id="themeToggle" class="icon-btn" title="Switch theme" aria-label="Switch theme">Dark</button>

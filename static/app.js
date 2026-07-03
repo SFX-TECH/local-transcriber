@@ -268,6 +268,10 @@ function handleEvent(job, ev) {
     if (Array.isArray(ev.segments) && ev.segments.length && !job.segments.length) {
       job.segments = ev.segments.map((s) => ({ start: s.start, end: s.end, text: s.text }));
     }
+    if (job.tabEl) {
+      job.tabEl.classList.add("just-done");
+      setTimeout(() => { if (job.tabEl) job.tabEl.classList.remove("just-done"); }, 950);
+    }
     fetchFolder(job);
   } else if (ev.type === "error") {
     failJob(job, ev.message || "Transcription failed.");
@@ -361,8 +365,12 @@ function updateRail(job) {
 }
 function updateRailCount() {
   const n = jobs.size;
-  const done = Array.from(jobs.values()).filter((j) => j.status === "done").length;
+  const vals = Array.from(jobs.values());
+  const done = vals.filter((j) => j.status === "done").length;
   railCount.textContent = n ? (done + " / " + n + " done") : "";
+  // Drive the topbar live-equalizer: on whenever any job is in flight.
+  const busy = vals.some((j) => j.status === "uploading" || j.status === "queued" || j.status === "running");
+  document.body.classList.toggle("busy", busy);
 }
 function closeJob(id) {
   const job = jobs.get(id); if (!job) return;
@@ -401,6 +409,10 @@ function renderActive() {
   rtitle.textContent = job.status === "done" ? ("Transcript: " + job.name) : job.name;
   folderEl.textContent = job.folder ? ("Saved to: " + job.folder) : "";
   job.segments.forEach((seg) => transcriptEl.appendChild(makeSegEl(job, seg)));
+  // While a fresh job is spinning up, show a shimmer skeleton until the first segment.
+  if (!job.segments.length && (job.status === "uploading" || job.status === "queued" || job.status === "running")) {
+    transcriptEl.innerHTML = skeletonHTML();
+  }
 
   // player (only for the focused job)
   buildPlayer(job);
@@ -477,6 +489,13 @@ setInterval(() => {
 }, 500);
 
 // --- transcript rendering (focused job) --------------------------------------
+// Shimmer placeholder shown while a job spins up and no segments have arrived.
+function skeletonHTML() {
+  const row =
+    '<div class="sk-row"><div class="sk-time"></div>' +
+    '<div class="sk-lines"><div class="sk-line"></div><div class="sk-line short"></div></div></div>';
+  return '<div class="skeleton" aria-hidden="true">' + row + row + row + "</div>";
+}
 function makeSegEl(job, seg) {
   const row = document.createElement("div");
   row.className = "seg";
@@ -493,7 +512,10 @@ function makeSegEl(job, seg) {
   return row;
 }
 function appendSegmentDOM(job, seg) {
+  // First real segment clears the shimmer skeleton.
+  if (transcriptEl.querySelector(".skeleton")) transcriptEl.innerHTML = "";
   transcriptEl.appendChild(makeSegEl(job, seg));
+  if (seg.el) seg.el.classList.add("fresh");
   transcriptEl.scrollTop = transcriptEl.scrollHeight;
   if (toolbar.hidden) toolbar.hidden = false;
 }
