@@ -70,10 +70,20 @@ def add(
     created_at: float | None = None,
 ) -> None:
     """Insert or replace a transcript. Safe to call more than once per job."""
-    segs = [
-        {"start": float(s.get("start", 0) or 0), "end": float(s.get("end", 0) or 0), "text": (s.get("text") or "").strip()}
-        for s in (segments or [])
-    ]
+    segs = []
+    for s in (segments or []):
+        entry = {
+            "start": float(s.get("start", 0) or 0),
+            "end": float(s.get("end", 0) or 0),
+            "text": (s.get("text") or "").strip(),
+        }
+        words = s.get("words")
+        if words:
+            entry["words"] = [
+                {"start": float(w.get("start", 0) or 0), "end": float(w.get("end", 0) or 0), "word": w.get("word", "")}
+                for w in words
+            ]
+        segs.append(entry)
     text = "\n".join(s["text"] for s in segs if s["text"])
     if created_at is None:
         created_at = time.time()

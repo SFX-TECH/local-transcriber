@@ -136,6 +136,15 @@ def test_end_to_end_pipeline() -> None:
         # so only the speech path asserts on transcript content.
         if mode == "speech":
             assert segments, "speech clip produced no segments"
+            # Word-level timings drive the karaoke highlight; every speech run
+            # should carry them, both on the streamed segment events and the
+            # final done payload.
+            seg_events = [e for e in events if e["type"] == "segment"]
+            assert seg_events and "words" in seg_events[0], "segment events carry no words"
+            words = [w for s in segments for w in s.get("words", [])]
+            assert words, "speech clip produced no word timings"
+            w0 = words[0]
+            assert "word" in w0 and w0["end"] >= w0["start"] >= 0, "word timing malformed"
 
         txt = core.to_txt(segments)
         srt = core.to_srt(segments)

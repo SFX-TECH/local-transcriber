@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Iterator, Optional
 
 import numpy as np
@@ -141,6 +141,9 @@ class Segment:
     start: float
     end: float
     text: str
+    # Per-word timestamps for karaoke highlighting: [{start, end, word}].
+    # Empty when the model did not produce word timings for this segment.
+    words: list = field(default_factory=list)
 
 
 def transcribe(
@@ -152,7 +155,8 @@ def transcribe(
     Yields progress events for streaming to the UI:
       {"type": "status",   "message": str, "device": str}
       {"type": "language", "language": str, "probability": float}
-      {"type": "segment",  "start": float, "end": float, "text": str, "progress": 0..1}
+      {"type": "segment",  "start": float, "end": float, "text": str,
+                           "words": [{start, end, word}...], "progress": 0..1}
       {"type": "done",     "segments": [Segment...], "duration": float}
       {"type": "error",    "message": str}
     """
@@ -180,6 +184,7 @@ def transcribe(
             beam_size=5,
             vad_filter=True,  # skip long silences -> faster, cleaner
             vad_parameters={"min_silence_duration_ms": 500},
+            word_timestamps=True,  # per-word timings drive the karaoke highlight
         )
         if total <= 0:
             total = float(getattr(info, "duration", 0.0)) or 0.0
@@ -188,12 +193,17 @@ def transcribe(
 
         collected: list[Segment] = []
         for seg in segments_iter:
+            words = [
+                {"start": round(w.start, 3), "end": round(w.end, 3), "word": w.word}
+                for w in (getattr(seg, "words", None) or [])
+                if w.start is not None and w.end is not None
+            ]
             s = Segment(start=round(seg.start, 3), end=round(seg.end, 3),
-                        text=seg.text.strip())
+                        text=seg.text.strip(), words=words)
             collected.append(s)
             prog = max(0.0, min(1.0, (seg.end / total) if total else 0.0))
             yield {"type": "segment", "start": s.start, "end": s.end,
-                   "text": s.text, "progress": round(prog, 4)}
+                   "text": s.text, "words": words, "progress": round(prog, 4)}
 
         yield {"type": "done",
                "segments": [asdict(s) for s in collected],
