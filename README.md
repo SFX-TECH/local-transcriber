@@ -2,11 +2,13 @@
 
 > Turn any video or audio into text on your own machine with OpenAI's Whisper. No cloud, no file-size cap, no paywall, nothing ever uploaded.
 
+[![CI](https://github.com/SFX-TECH/local-transcriber/actions/workflows/ci.yml/badge.svg)](https://github.com/SFX-TECH/local-transcriber/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-2ea44f)
-![Privacy](https://img.shields.io/badge/privacy-100%25%20local-2ea44f)
-![AI](https://img.shields.io/badge/AI-Whisper%20offline-7a5cff)
-![Stack](https://img.shields.io/badge/FastAPI-Python%203.11-3b5bdb)
-![Docker](https://img.shields.io/badge/Docker-ready-000000)
+![Privacy](https://img.shields.io/badge/privacy-100%25%20local%2C%20fully%20offline-2ea44f)
+![Whisper](https://img.shields.io/badge/Whisper-faster--whisper-7a5cff)
+![Stack](https://img.shields.io/badge/FastAPI-Python%203.11%2B-3b5bdb)
+![Docker](https://img.shields.io/badge/Docker-CPU%20%2B%20GPU-000000)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-KEDA%20autoscaled-326ce5)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Jesse%20Jolly-0a66c2)](https://linkedin.com/in/jessegjolly)
 
 <p align="center">
@@ -56,6 +58,17 @@ items from a local Ollama model, and is saved to a library you can search across
 </table>
 
 ---
+
+## Contents
+
+- [What it does](#what-it-does)
+- [How it works](#how-it-works)
+- [Quickstart](#quickstart)
+- [Tech](#tech)
+- [Testing](#testing)
+- [Status](#status)
+- [Scale it: Kubernetes + KEDA](#scale-it-kubernetes--keda)
+- [License](#license)
 
 ## The problem
 
@@ -127,7 +140,7 @@ edits); the Word export is built locally by the server with `python-docx`.
 
 ### Windows (no Docker)
 
-1. Install [Python 3.11](https://www.python.org/downloads/) and
+1. Install [Python 3.11 or newer](https://www.python.org/downloads/) and
    [ffmpeg](https://ffmpeg.org/download.html) (on your PATH, or set `FFMPEG_PATH`).
 2. Double-click **`setup.bat`** once. It builds a virtual environment and installs
    the pinned dependencies.
