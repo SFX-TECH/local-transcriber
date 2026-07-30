@@ -98,6 +98,10 @@ calls, or anything sensitive, that is the wrong trade.
 - **Synced media player** with **word-level karaoke**: the file plays back in the
   browser and the current line highlights as it goes, with the exact word lighting
   up in time with the audio. Click any line to jump there.
+- **Speaker diarization (optional)**: tick "Identify who spoke" and each line is
+  labelled and color-coded by speaker, powered by a **local, ungated** ONNX model
+  (sherpa-onnx). No Hugging Face token, no account, no cloud. See
+  [docs/adr/0001-local-speaker-diarization.md](docs/adr/0001-local-speaker-diarization.md).
 - **Edit** the transcript inline, **search** it with highlighting, and **copy** it
   with or without timestamps.
 - **Export** to plain text (`.txt`), subtitles (`.srt`), web captions (`.vtt`),

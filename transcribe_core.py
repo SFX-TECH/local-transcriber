@@ -150,6 +150,7 @@ def transcribe(
     input_path: str,
     model_name: str = "small",
     language: Optional[str] = None,  # None = auto-detect
+    diarize: bool = False,           # attach speaker labels (local, optional)
 ) -> Iterator[dict]:
     """
     Yields progress events for streaming to the UI:
@@ -157,8 +158,12 @@ def transcribe(
       {"type": "language", "language": str, "probability": float}
       {"type": "segment",  "start": float, "end": float, "text": str,
                            "words": [{start, end, word}...], "progress": 0..1}
-      {"type": "done",     "segments": [Segment...], "duration": float}
+      {"type": "done",     "segments": [Segment...], "duration": float, "speakers": int}
       {"type": "error",    "message": str}
+
+    When diarize is True and local diarization is available, each done segment (and
+    its words) gains a "speaker" index and "speakers" is the count found. Diarization
+    is best-effort: if it is unavailable or fails, the transcript is returned as-is.
     """
     if model_name not in MODELS:
         model_name = "small"
@@ -205,9 +210,24 @@ def transcribe(
             yield {"type": "segment", "start": s.start, "end": s.end,
                    "text": s.text, "words": words, "progress": round(prog, 4)}
 
+        done_segments = [asdict(s) for s in collected]
+        speakers = 0
+        if diarize:
+            try:
+                import diarize as diarizer  # local module; import is network-free
+
+                if diarizer.available():
+                    yield {"type": "status", "message": "Identifying speakers...", "device": note}
+                    turns = diarizer.diarize_wav(wav)
+                    diarizer.assign_speakers(done_segments, turns)
+                    speakers = diarizer.speaker_count(turns)
+            except Exception:  # noqa: BLE001
+                # Diarization is a best-effort enrichment; never fail the transcript.
+                speakers = 0
         yield {"type": "done",
-               "segments": [asdict(s) for s in collected],
-               "duration": round(total, 2)}
+               "segments": done_segments,
+               "duration": round(total, 2),
+               "speakers": speakers}
     except Exception as exc:  # noqa: BLE001
         yield {"type": "error", "message": f"{type(exc).__name__}: {exc}"}
     finally:

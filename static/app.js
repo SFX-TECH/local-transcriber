@@ -17,6 +17,7 @@ const libraryBtn = $("libraryBtn"), libraryView = $("libraryView"), libSearch = 
 const libCount = $("libCount"), libList = $("libList"), libEmpty = $("libEmpty"), libClose = $("libClose");
 const dz = $("dropzone"), fileInput = $("file"), chipsWrap = $("filechips");
 const go = $("go"), modelSel = $("model"), langSel = $("language");
+const diarizeCtl = $("diarizeCtl"), diarizeCk = $("diarize");
 
 // --- workspace / focused-view elements ---------------------------------------
 const workspace = $("workspace"), tabbar = $("tabbar");
@@ -116,6 +117,12 @@ fetch("/api/device")
   .then((d) => { if (d && d.device) applyDeviceBadge(devBadge, d.device); })
   .catch(() => { devBadge.textContent = "hardware unknown"; devBadge.classList.remove("idle"); });
 
+// Show the "Identify who spoke" toggle only when local diarization is available.
+fetch("/api/diarize/status")
+  .then((r) => r.json())
+  .then((d) => { if (d && d.available) diarizeCtl.hidden = false; })
+  .catch(() => {});
+
 // --- file staging ------------------------------------------------------------
 const NON_MEDIA = /\.(txt|pdf|docx?|xlsx?|pptx?|zip|rar|7z|gz|tar|exe|dll|msi|bat|png|jpe?g|gif|bmp|svg|webp|ico|csv|json|html?|md|py|js|css)$/i;
 
@@ -170,23 +177,24 @@ addFilesBtn.addEventListener("click", () => showUploadCard(true));
 go.addEventListener("click", () => {
   if (!staged.length) return;
   const model = modelSel.value, lang = langSel.value;
+  const diar = !!(diarizeCk && diarizeCk.checked && !diarizeCtl.hidden);
   const batch = staged.slice();
   staged = []; renderChips();
   showUploadCard(false);
   workspace.hidden = false;
   let firstNewId = null;
   for (const file of batch) {
-    const id = startJob(file, model, lang);
+    const id = startJob(file, model, lang, diar);
     if (id && !firstNewId) firstNewId = id;
   }
   if (firstNewId) setActive(firstNewId);
   updateRailCount();
 });
 
-function startJob(file, model, lang) {
+function startJob(file, model, lang, diarize) {
   const job = {
     id: "pending-" + Math.random().toString(36).slice(2),
-    file, name: file.name, model, lang,
+    file, name: file.name, model, lang, diarize: !!diarize,
     status: "uploading", segments: [], duration: 0,
     detectedLang: "", device: "", progress: 0,
     startedAt: 0, finishedInMs: 0,
@@ -201,6 +209,7 @@ function startJob(file, model, lang) {
   fd.append("file", file);
   fd.append("model", model);
   fd.append("language", lang);
+  fd.append("diarize", diarize ? "true" : "false");
 
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "/api/jobs");
@@ -245,6 +254,7 @@ function streamJob(job) {
 }
 
 function handleEvent(job, ev) {
+  let rerenderForSpeakers = false;
   if (ev.type === "queued") {
     job.status = "queued";
   } else if (ev.type === "status") {
@@ -270,13 +280,31 @@ function handleEvent(job, ev) {
     job.progress = 1;
     if (ev.duration) job.duration = ev.duration;
     if (job.startedAt) job.finishedInMs = Date.now() - job.startedAt;
-    if (Array.isArray(ev.segments) && ev.segments.length && !job.segments.length) {
-      job.segments = ev.segments.map((s) => ({ start: s.start, end: s.end, text: s.text, words: s.words || [] }));
+    job.speakers = ev.speakers || 0;
+    if (Array.isArray(ev.segments) && ev.segments.length) {
+      if (!job.segments.length) {
+        job.segments = ev.segments.map((s) => ({
+          start: s.start, end: s.end, text: s.text, words: s.words || [],
+          speaker: (s.speaker != null ? s.speaker : null),
+        }));
+      } else if (job.speakers > 0) {
+        // Speakers are known only at the end; merge them onto the streamed segments.
+        ev.segments.forEach((s, i) => {
+          const seg = job.segments[i];
+          if (seg && s.speaker != null) {
+            seg.speaker = s.speaker;
+            if (seg.words && s.words) seg.words.forEach((w, j) => {
+              if (s.words[j] && s.words[j].speaker != null) w.speaker = s.words[j].speaker;
+            });
+          }
+        });
+      }
     }
     if (job.tabEl) {
       job.tabEl.classList.add("just-done");
       setTimeout(() => { if (job.tabEl) job.tabEl.classList.remove("just-done"); }, 950);
     }
+    if (job.id === activeId && job.speakers > 0) rerenderForSpeakers = true;
     fetchFolder(job);
   } else if (ev.type === "error") {
     failJob(job, ev.message || "Transcription failed.");
@@ -285,7 +313,7 @@ function handleEvent(job, ev) {
   updateTab(job);
   updateRail(job);
   updateRailCount();
-  if (job.id === activeId) renderFocusLive(job);
+  if (job.id === activeId) { if (rerenderForSpeakers) renderActive(); else renderFocusLive(job); }
 }
 
 function failJob(job, msg) {
@@ -529,7 +557,14 @@ function makeSegEl(job, seg) {
   const text = document.createElement("span");
   text.className = "seg-text";
   text.contentEditable = job.editing ? "true" : "false";
-  row.appendChild(t); row.appendChild(text);
+  row.appendChild(t);
+  if (seg.speaker != null) {
+    const chip = document.createElement("span");
+    chip.className = "spk spk-" + (((seg.speaker % 8) + 8) % 8);
+    chip.textContent = "Speaker " + (seg.speaker + 1);
+    row.appendChild(chip);
+  }
+  row.appendChild(text);
   seg.el = row; seg.textEl = text;
   paintSegText(seg, job);
   t.addEventListener("click", (e) => { e.stopPropagation(); seekTo(seg.start); });
@@ -962,7 +997,7 @@ async function openLibraryItem(id) {
   } catch (e) { toast("Could not open that transcript.", true); return; }
   const job = {
     id: jid, file: null, name: d.name || "transcript", model: d.model || "", lang: d.language || "",
-    status: "done", segments: (d.segments || []).map((s) => ({ start: s.start, end: s.end, text: s.text, words: s.words || [] })),
+    status: "done", segments: (d.segments || []).map((s) => ({ start: s.start, end: s.end, text: s.text, words: s.words || [], speaker: (s.speaker != null ? s.speaker : null) })),
     duration: d.duration || 0, detectedLang: d.language || "", device: "",
     progress: 1, startedAt: 0, finishedInMs: 0, es: null, errorMsg: "",
     editing: false, searchQuery: "", tabEl: null, railEl: null, fromLibrary: true,

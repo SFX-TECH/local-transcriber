@@ -90,7 +90,7 @@ async def index() -> HTMLResponse:
 
 
 # --- upload ------------------------------------------------------------------
-async def _store_upload(file: UploadFile, model: str, language: str):
+async def _store_upload(file: UploadFile, model: str, language: str, diarize: bool = False):
     """Stream an upload to shared storage, create the job, and enqueue it."""
     if not file.filename:
         raise HTTPException(400, "No file provided.")
@@ -113,7 +113,7 @@ async def _store_upload(file: UploadFile, model: str, language: str):
         raise HTTPException(400, "Empty upload.")
 
     lang = "auto" if language in ("auto", "", None) else language
-    q.create_job(r(), job_id, safe_name, model, lang, dest)
+    q.create_job(r(), job_id, safe_name, model, lang, dest, diarize=diarize)
     q.enqueue(r(), job_id)
     return job_id, safe_name, size
 
@@ -123,9 +123,10 @@ async def create_job(
     file: UploadFile,
     model: str = Form("small"),
     language: str = Form("auto"),
+    diarize: bool = Form(False),
 ) -> JSONResponse:
     """Original JSON API, kept for scripts/demo."""
-    job_id, _name, size = await _store_upload(file, model, language)
+    job_id, _name, size = await _store_upload(file, model, language, diarize)
     return JSONResponse({"job_id": job_id, "status": "queued", "size": size})
 
 
@@ -134,11 +135,21 @@ async def api_create_job(
     file: UploadFile,
     model: str = Form("small"),
     language: str = Form("auto"),
+    diarize: bool = Form(False),
 ) -> JSONResponse:
     """Upload endpoint the web UI uses (mirrors the single-process app)."""
-    job_id, name, size = await _store_upload(file, model, language)
+    job_id, name, size = await _store_upload(file, model, language, diarize)
     q.push_event(r(), job_id, {"type": "queued"})
     return JSONResponse({"job_id": job_id, "name": name, "size": size})
+
+
+@app.get("/api/diarize/status")
+async def api_diarize_status() -> JSONResponse:
+    import diarize as diar
+
+    loop = asyncio.get_event_loop()
+    ok = await loop.run_in_executor(None, diar.available)
+    return JSONResponse({"available": ok})
 
 
 @app.get("/api/device")

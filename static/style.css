@@ -237,6 +237,10 @@ body.busy .live{display:inline-flex}
 .btn.primary:hover{filter:brightness(1.05)}
 .btn.primary:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;filter:none}
 .btn.ghost[aria-pressed="true"]{background:var(--accent-weak);border-color:var(--accent);color:var(--accent)}
+.ctl-check{justify-content:flex-end}
+.ctl-check .check{display:inline-flex;align-items:center;gap:8px;height:41px}
+.ctl-check input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto}
+.ctl-check .check-label{font-size:13px;color:var(--text);font-weight:500;letter-spacing:normal;text-transform:none}
 
 /* Progress */
 .progress{padding:16px 18px}
@@ -312,6 +316,13 @@ body.busy .live{display:inline-flex}
 .transcript .seg .seg-text{flex:1;color:var(--text);outline:none}
 .transcript .seg .w{border-radius:4px;transition:background .08s var(--ease),color .08s var(--ease)}
 .transcript .seg .w.wnow{background:var(--accent-weak);color:var(--accent);box-shadow:0 0 0 1px var(--accent-ring),var(--glow)}
+/* Speaker chips (diarization): one stable color per speaker */
+.transcript .seg .spk{
+  display:inline-flex;align-items:center;align-self:center;height:19px;padding:0 8px;border-radius:6px;
+  font-size:10.5px;font-weight:800;letter-spacing:.2px;color:#fff;flex:0 0 auto;white-space:nowrap;
+}
+.spk-0{background:#4f46e5}.spk-1{background:#0891b2}.spk-2{background:#0f766e}.spk-3{background:#c2410c}
+.spk-4{background:#7c3aed}.spk-5{background:#be185d}.spk-6{background:#4d7c0f}.spk-7{background:#b45309}
 .transcript.editing{cursor:text}
 .transcript.editing .seg{cursor:text}
 .transcript.editing .seg .seg-text{

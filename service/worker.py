@@ -53,12 +53,13 @@ def process_job(r, job_id: str) -> str:
     model = job.get("model", "small")
     language = job.get("language", "auto")
     lang = None if language in ("auto", "", None) else language
+    diarize = job.get("diarize", "0") == "1"
 
     try:
         segments: list[dict] = []
         duration = 0.0
         detected = ""
-        for ev in core.transcribe(input_path, model_name=model, language=lang):
+        for ev in core.transcribe(input_path, model_name=model, language=lang, diarize=diarize):
             kind = ev.get("type")
             if kind == "status":
                 q.push_event(r, job_id, ev)

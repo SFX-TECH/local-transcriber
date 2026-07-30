@@ -119,7 +119,10 @@ def test_end_to_end_pipeline() -> None:
         mode = _make_clip(clip)
         assert os.path.getsize(clip) > 0, "ffmpeg did not produce a clip"
 
-        events = list(core.transcribe(clip, model_name=MODEL, language="en"))
+        # diarize=True exercises the optional speaker path. When the diarization
+        # models are absent (as on CI), it is a graceful no-op (speakers=0) and
+        # must not affect the transcript; when present, it labels speakers.
+        events = list(core.transcribe(clip, model_name=MODEL, language="en", diarize=True))
         types = [e["type"] for e in events]
         errors = [e for e in events if e["type"] == "error"]
         done = [e for e in events if e["type"] == "done"]
@@ -127,6 +130,7 @@ def test_end_to_end_pipeline() -> None:
         assert not errors, f"pipeline reported error(s): {errors}"
         assert "status" in types, "no status events emitted"
         assert done, "pipeline never reached a 'done' event"
+        assert "speakers" in done[0], "done event missing the 'speakers' count"
 
         segments = done[0]["segments"]
         duration = done[0]["duration"]
