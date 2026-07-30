@@ -16,3 +16,6 @@ python-docx==1.2.0
 lxml==6.1.1
 # Redis client for the queue-based Kubernetes service (api + worker).
 redis==8.0.1
+# Local speaker diarization: pure ONNX, no torch, no Hugging Face token.
+# Pulls the prebuilt sherpa-onnx-core wheel (native lib, no build on install).
+sherpa-onnx==1.13.4

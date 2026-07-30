@@ -24,10 +24,16 @@ COPY requirements-cpu.txt .
 RUN pip install --no-cache-dir -r requirements-cpu.txt
 
 # Application code (kept minimal; see .dockerignore).
-COPY app.py transcribe_core.py ai_summary.py library.py test_smoke.py ./
+COPY app.py transcribe_core.py ai_summary.py library.py diarize.py test_smoke.py ./
 COPY static ./static
+COPY scripts ./scripts
 # Queue-based service (api + worker) for the Kubernetes path.
 COPY service ./service
+
+# Bake the small (~35 MB), ungated diarization models so "Identify speakers"
+# works out of the box. Non-fatal so an offline build still succeeds (the feature
+# just reports itself unavailable until the models are present).
+RUN python scripts/get_diarization_models.py || echo "diarization models not fetched; feature unavailable"
 
 # Send model downloads to a path we mount a named volume on, so they survive
 # container restarts and are never re-downloaded.

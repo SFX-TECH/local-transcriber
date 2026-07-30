@@ -70,7 +70,7 @@ def job_key(job_id: str) -> str:
 
 # --- queue + state -----------------------------------------------------------
 def create_job(r, job_id: str, name: str, model: str, language: str,
-               input_path) -> None:
+               input_path, diarize: bool = False) -> None:
     r.hset(job_key(job_id), mapping={
         "id": job_id,
         "status": "queued",
@@ -78,6 +78,7 @@ def create_job(r, job_id: str, name: str, model: str, language: str,
         "model": model,
         "language": language,
         "input_path": str(input_path),
+        "diarize": "1" if diarize else "0",
         "created": str(time.time()),
         "error": "",
     })

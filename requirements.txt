@@ -25,6 +25,9 @@ lxml==6.1.1
 # --- Redis client for the queue-based Kubernetes service ---
 redis==8.0.1
 
+# --- Local speaker diarization (pure ONNX, no torch, no Hugging Face token) ---
+sherpa-onnx==1.13.4
+
 # --- GPU (CUDA) runtime libraries ---
 # Needed for the NVIDIA CUDA path. They are plain pip wheels and are harmless if
 # no GPU is present (the app self-tests CUDA and falls back to CPU). The CPU-only

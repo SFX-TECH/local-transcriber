@@ -77,6 +77,8 @@ def add(
             "end": float(s.get("end", 0) or 0),
             "text": (s.get("text") or "").strip(),
         }
+        if s.get("speaker") is not None:
+            entry["speaker"] = int(s["speaker"])
         words = s.get("words")
         if words:
             entry["words"] = [

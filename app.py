@@ -68,14 +68,15 @@ def _safe_stem(name: str) -> str:
     return stem[:80]
 
 
-def _run_job(job_id: str, media_path: Path, model: str, language: str | None) -> None:
+def _run_job(job_id: str, media_path: Path, model: str, language: str | None,
+             diarize: bool = False) -> None:
     job = JOBS[job_id]
     q: queue.Queue = job["queue"]
     out_dir = OUTPUT / job_id
     out_dir.mkdir(parents=True, exist_ok=True)
     detected = ""
     try:
-        for event in core.transcribe(str(media_path), model_name=model, language=language):
+        for event in core.transcribe(str(media_path), model_name=model, language=language, diarize=diarize):
             if event["type"] == "language":
                 detected = event.get("language", "")
             elif event["type"] == "done":
@@ -127,7 +128,7 @@ def _worker_loop() -> None:
         # Nudge the stream so the tab flips from queued to running promptly,
         # even before the (possibly slow) model load emits its first status.
         job["queue"].put({"type": "status", "message": "Starting..."})
-        _run_job(job_id, job["_media_path"], job["_model"], job["_lang"])
+        _run_job(job_id, job["_media_path"], job["_model"], job["_lang"], job.get("_diarize", False))
 
 
 for _ in range(MAX_CONCURRENT):
@@ -149,11 +150,22 @@ async def device() -> JSONResponse:
     return JSONResponse({"device": note, "gpu": note.lower().startswith("gpu")})
 
 
+@app.get("/api/diarize/status")
+async def diarize_status() -> JSONResponse:
+    """Whether local speaker diarization is available (library + models present)."""
+    import diarize as diar
+
+    loop = asyncio.get_event_loop()
+    ok = await loop.run_in_executor(None, diar.available)
+    return JSONResponse({"available": ok})
+
+
 @app.post("/api/jobs")
 async def create_job(
     file: UploadFile,
     model: str = Form("small"),
     language: str = Form("auto"),
+    diarize: bool = Form(False),
 ) -> JSONResponse:
     # Validate before we spend time/disk streaming a multi-GB upload.
     if not file.filename:
@@ -198,6 +210,7 @@ async def create_job(
         "_media_path": media_path,
         "_model": model,
         "_lang": lang,
+        "_diarize": diarize,
     }
     # Announce the wait immediately; a pool worker flips it to running.
     jq.put({"type": "queued"})
