@@ -61,6 +61,7 @@ items from a local Ollama model, and is saved to a library you can search across
 
 ## Contents
 
+- [The problem](#the-problem)
 - [What it does](#what-it-does)
 - [How it works](#how-it-works)
 - [Quickstart](#quickstart)
@@ -186,9 +187,11 @@ Models download once (Small ~0.5 GB, Large v3 ~3 GB) and are cached after that.
 |---|---|
 | Server | Python 3.11 + FastAPI, server-sent events for live streaming |
 | Transcription | faster-whisper (Whisper) + ffmpeg, GPU/CPU auto-select with a real CUDA self-test |
+| Diarization (optional) | sherpa-onnx (ONNX, CPU-native), ungated models, no Hugging Face token |
+| AI insights (optional) | local Ollama (default qwen3:8b) for summary, chapters, and action items |
 | UI | Local web page (HTML/CSS/JS), light theme with a dark toggle, synced player |
 | Exports | txt / srt / vtt / md / json in the browser, docx via python-docx |
-| Packaging | Docker (CPU and optional GPU), persistent model-cache volume |
+| Packaging | Docker (CPU and optional GPU), persistent model-cache volume; Kubernetes + Helm + KEDA for scale-from-zero |
 
 ## Testing
 
